@@ -6,7 +6,7 @@
  */
 
 #include "stm32l4xx_hal.h"
-#include "SPI.h"
+#include <SPI_LL.h>
 
 void SPI1_init(){
 	RCC->APB2ENR |= (1 << 12);	//enable SPI1 clock

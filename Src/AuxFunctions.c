@@ -6,12 +6,12 @@
  */
 
 #include "stm32l4xx_hal.h"
-#include "usb_device.h"
+#include <usb_device_ST.h>
 #include "AuxFunctions.h"
-#include "LTC6803_3.h"
-#include "ADC.h"
+#include <LTC6803_3_DD.h>
+#include <ADC_LL.h>
 #include "main.h"
-#include "dStorage.h"
+#include <dStorage_MD.h>
 
 extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 extern nonVolParameters nonVolPars;
@@ -281,120 +281,6 @@ uint8_t chargeControl(){
 		break;
 	}
 
-
-	/*
-	switch(0){
-	case 0:						//stop charging, shut off Vsenses and turn off MOSFET bridge
-		__DISABLE_CHG;
-		__DISABLE_BAT_VOLTAGE;
-		chargingState = 0;
-		chargingStatus = 0;
-		break;
-
-	case 1:
-
-		switch( chargingState ){
-		case 0:							//Enable 5V buck and battery Vsense
-			if( waitTime != 0 )
-				waitTime--;
-			else if( ADC_convertedResults[chargerVoltage] >= 5000 ){
-				if( nonVolPars.chgParas.packCellCount == countCells() ){	//if detect as many cells as configured
-					__ENABLE_5V_BUCK;
-					__ENABLE_BAT_VOLTAGE;
-					chargingState = 1;
-					chargingStatus = 2;
-					waitTime = 100;
-				}
-			}
-
-			break;
-
-		case 1:
-			if( waitTime != 0 )
-				waitTime--;
-			else if( (ADC_convertedResults[batteryVoltage] >= (nonVolPars.chgParas.packCellCount * 2500)) ){	//if battery voltage higher than 2,5V average cell voltage
-				__ENABLE_CHG;
-				chargingState = 2;
-				waitTime = 20;
-			}
-
-			break;
-
-		case 2:
-			if( waitTime != 0 )
-				waitTime--;
-			else if( (ADC_convertedResults[chargeCurrent] >= nonVolPars.chgParas.termCurr) &&		//if current not below termination current
-					(ADC_convertedResults[chargeCurrent] <= nonVolPars.chgParas.maxChgCurr) &&		//and below max charging current
-					(highestCell(nonVolPars.chgParas.packCellCount) <= nonVolPars.chgParas.termCellVolt) ){	//and highest cell not above termination cell voltage
-
-				uint8_t balancing = 0;
-				for(uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){
-					if( 	(LTC6803_getCellVoltage(x) >= nonVolPars.chgParas.cellBalVolt) &&						//if cell voltage at allowed balance voltage
-							(LTC6803_getCellVoltage(x) > (lowestCell(nonVolPars.chgParas.packCellCount) + nonVolPars.chgParas.cellDiffVolt)) ){	//and cell difference greater than allowed compared to the lowest cell
-						LTC6803_setCellDischarge(x, 1);
-						balancing++;
-					}
-					else
-						LTC6803_setCellDischarge(x, 0);
-				}
-
-				if( balancing > 0 )
-					chargingStatus = 3;
-				else
-					chargingStatus = 2;
-
-			}
-			else{
-				__DISABLE_CHG;
-				chargingState = 3;
-				chargingStatus = 0;
-			}
-
-			break;
-
-		case 3:
-			if( ADC_convertedResults[chargerVoltage] <= 500 ){
-				__DISABLE_BAT_VOLTAGE;
-				chargingState = 0;
-				chargingStatus = 0;
-				waitTime = 50;
-			}
-
-			break;
-
-		default:
-			break;
-		}
-
-		break;
-
-		default:
-			break;
-	}
-	 */
-
-	//status led control
-//	switch( chargingStatus ){
-//	case 0:		//no charging going on
-//		__GREEN_LED_OFF;
-//		__RED_LED_OFF;
-//		break;
-//	case 1:		//error
-//		__GREEN_LED_OFF;
-//		__RED_LED_ON;
-//		break;
-//	case 2:		//charging
-//		__GREEN_LED_ON;
-//		__RED_LED_OFF;
-//		break;
-//	case 3:		//balancing and possibly charging
-//		__GREEN_LED_ON;
-//		__RED_LED_ON;
-//		break;
-//	default:
-//		break;
-//	}
-
 	runtimePars.chargingState = chargingState;
 
 	return chargingState;
@@ -564,6 +450,63 @@ void checkMaxCurrentFault(){
 	}
 	else{
 		runtimePars.faults &= ~(1 << fault_highChargingCurrent);
+	}
+
+}
+
+void changeRunMode(uint8_t runMode){
+
+	switch(runMode){
+
+	case 0: 			//LOW-POWER STANDBY MODE
+		if( usbPowerPresent() ){		//opto_enable found || charger_detected)
+			PWR->CR1 &= ~(1 << 14);			//disable low-power run mode
+			while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle
+			while ( !(RCC->CR & RCC_CR_MSIRDY));
+			RCC->CR = (RCC->CR & ~(0xF << 4)) | (8 << 4);	//set MSI clock frequency to 16MHz
+			RCC->CR |= (1 << 3);					//activate new MSI clock frequency
+
+
+			__ENABLE_5V_BUCK;			//turn on 5V buck SMPS
+			//TODO ENABLE PERIPHERALS
+
+			runMode = 1;
+		}
+		break;
+
+	case 1: 			//RUN MODE
+		if( usbPowerPresent() ){
+			PWR->CR1 = (PWR->CR1 & ~(3 << 9)) | (1 << 9);		//set voltage scaling to range 1 (high frequency)
+			while( !!(PWR->SR2 & (1 << 10)) );					//wait for voltage regulator to settle
+			FLASH->ACR = (FLASH->ACR & ~(7 << 0)) | (0 << 0);	//decrease flash memory wait states
+
+			RCC->CRRCR |= (1 << 0);			//enable HSI48 clock, used for USB
+			while( !(RCC->CRRCR & (1 << 1)) );	//wait for HSI48 to stabilize
+			RCC->APB1ENR1 |= (1 << 26);		//enable USB FS bus clock
+			USBD_Start(&hUsbDeviceFS);		//Start usb service
+
+			runMode = 2;
+		}
+		else if( 0 ){	//opto_enable not found && charger not detected
+			while ( !(RCC->CR & RCC_CR_MSIRDY));
+			RCC->CR &= ~(0xF << 4);								//set MSI clock frequency to 100kHz
+			RCC->CR |= (1 << 3);								//activate new MSI clock frequency
+
+			//PWR->CR1 |= (1 << 14);					//Go into low-power run mode
+
+			//TODO DISABLE PERIPHERALS
+			__DISABLE_5V_BUCK;			//turn off 5V buck SMPS
+
+			runMode = 0;
+		}
+		break;
+
+	case 2:				//RUN MODE WITH USB
+		if(1){
+
+		}
+		break;
+
 	}
 
 }

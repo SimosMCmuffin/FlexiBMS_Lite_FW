@@ -6,8 +6,8 @@
  */
 
 #include "stm32l4xx_hal.h"
-#include "LTC6803_3.h"
-#include "SPI.h"
+#include <LTC6803_3_DD.h>
+#include <SPI_LL.h>
 
 void LTC6803_init(void){
 	LTC_data.CFGR[0] = 0xE1;
@@ -179,13 +179,63 @@ uint8_t calculatePEC(uint8_t PEC, uint8_t incoming){		//calculate PEC (Packet Er
 	return PEC;
 }
 
-void LTC6803_baseFunction(void){
-	SPI_message = 5;
-	SPI_index = 0;
+void LTC6803_transactionHandler(uint64_t* LTC6803tick){
+	static uint64_t LTC6803resetTick = 0;
+	static uint8_t LTC6803commsState = 0;
 
-	CLR_CS_PIN;
+	if( LTC6803resetTick == 0)
+		LTC6803resetTick = HAL_GetTick();
 
-	*(uint8_t *)&SPI1->DR = 0x33;
+	if( SPI_message == 0 ){
+		LTC6803resetTick = HAL_GetTick();
+
+		switch( LTC6803commsState ){
+
+		case 0:
+			LTC6803_convertTemperatureVoltages();
+			LTC6803_writeConfiguration();
+			LTC6803commsState = 1;
+			break;
+
+		case 1:
+			LTC6803_startCellMeasurements();
+			*LTC6803tick = HAL_GetTick() + 20;
+			LTC6803commsState = 2;
+			break;
+
+		case 2:
+			LTC6803_readCellMeasurements();
+			LTC6803commsState = 3;
+			break;
+
+		case 3:
+			LTC6803_convertCellVoltages();
+			LTC6803_startOpenCellMeasurements();
+			*LTC6803tick = HAL_GetTick() + 20;
+			LTC6803commsState = 4;
+			break;
+
+		case 4:
+			LTC6803_readCellMeasurements();
+			LTC6803commsState = 5;
+			break;
+
+		case 5:
+			LTC6803_convertOpenCellVoltages();
+			LTC6803_startInternalTemperatureMeas();
+			LTC6803commsState = 6;
+			break;
+
+		case 6:
+			LTC6803_readInternalTemperature();
+			LTC6803commsState = 0;
+			break;
+
+		default:
+			break;
+		}
+	}
+
 }
 
 void SPI1_IRQHandler(){

@@ -47,7 +47,7 @@
 */
 
 /* Includes ------------------------------------------------------------------*/
-#include "usbd_cdc_if.h"
+#include <usbd_cdc_if_ST.h>
 /* USER CODE BEGIN INCLUDE */
 /* USER CODE END INCLUDE */
 

@@ -5,11 +5,13 @@
  *      Author: Simos MCmuffin
  */
 
-#include "USB_comms_handler.h"
-#include "usbd_cdc_if.h"
-#include "dStorage.h"
-#include "ADC.h"
-#include "LTC6803_3.h"
+#include <USB_comms_handler_MD.h>
+#include <usbd_cdc_if_ST.h>
+#include <dStorage_MD.h>
+#include <ADC_LL.h>
+#include <LTC6803_3_DD.h>
+
+
 
 #define APP_RX_DATA_SIZE  64
 

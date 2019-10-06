@@ -5,8 +5,8 @@
  *      Author: Simos MCmuffin
  */
 
-#ifndef USB_COMMS_HANDLER_H_
-#define USB_COMMS_HANDLER_H_
+#ifndef USB_COMMS_HANDLER_MD_H_
+#define USB_COMMS_HANDLER_MD_H_
 
 #include "main.h"
 
@@ -83,4 +83,4 @@ void appendParameter(uint8_t*, uint16_t, uint16_t*);
 void appendFault(uint8_t*, uint16_t, uint16_t*);
 
 
-#endif /* USB_COMMS_HANDLER_H_ */
+#endif /* USB_COMMS_HANDLER_MD_H_ */

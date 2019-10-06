@@ -5,8 +5,8 @@
  *      Author: Simos MCmuffin
  */
 
-#ifndef ADC_H_
-#define ADC_H_
+#ifndef ADC_LL_H_
+#define ADC_LL_H_
 
 typedef enum
 {
@@ -43,4 +43,4 @@ void ADC_setupSequence(void);
 void ADC_runSequence(void);
 
 
-#endif /* ADC_H_ */
+#endif /* ADC_LL_H_ */

@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "main.h"
-#include "stm32l4xx.h"
+#include <stm32l4xx.h>
 #include "stm32l4xx_hal.h"
 
 /* USER CODE BEGIN INCLUDE */

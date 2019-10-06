@@ -5,12 +5,12 @@
  *      Author: Simos MCmuffin
  */
 
-#ifndef CAN_H_
-#define CAN_H_
+#ifndef CAN_LL_H_
+#define CAN_LL_H_
 
 void CAN1_init(void);
 void CAN1_deInit(void);
 uint8_t CAN1_transmit(uint32_t, uint8_t *, uint32_t);
 
 
-#endif /* CAN_H_ */
+#endif /* CAN_LL_H_ */

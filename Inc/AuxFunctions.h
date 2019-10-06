@@ -13,8 +13,9 @@ uint8_t countCells(void);
 uint16_t highestCell(uint8_t);
 uint16_t lowestCell(uint8_t);
 uint8_t usbPowerPresent(void);
-uint8_t chargeControl();
-void statusLed();
+uint8_t chargeControl(void);
+void statusLed(void);
+void changeRunMode(uint8_t);
 
 void checkChargerVoltageFault(void);
 void checkBMStemperatureFault(void);

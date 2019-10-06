@@ -26,7 +26,7 @@
 #endif
 
 /* Includes ------------------------------------------------------------------*/
-#include "usbd_conf.h"
+#include <usbd_conf_ST.h>
 #include "usbd_def.h"
 #include "usbd_ioreq.h"
 #include "usbd_ctlreq.h"

@@ -5,8 +5,8 @@
  *      Author: Simos MCmuffin
  */
 
-#ifndef DSTORAGE_H_
-#define DSTORAGE_H_
+#ifndef DSTORAGE_MD_H_
+#define DSTORAGE_MD_H_
 
 #define __FLASH_NON_VOL_SIZE (0x200)	//how many bytes are reserved for the non-volatile parameters
 
@@ -16,4 +16,4 @@ uint8_t loadNonVolatileParameters(nonVolParameters*);
 
 uint8_t saveNonVolatileParameters(nonVolParameters*);
 
-#endif /* DSTORAGE_H_ */
+#endif /* DSTORAGE_MD_H_ */

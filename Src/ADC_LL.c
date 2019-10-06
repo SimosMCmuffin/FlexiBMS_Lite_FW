@@ -7,7 +7,7 @@
 
 #include "main.h"
 #include "math.h"
-#include "ADC.h"
+#include <ADC_LL.h>
 
 extern nonVolParameters nonVolPars;
 

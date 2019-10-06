@@ -6,7 +6,7 @@
  */
 
 #include "stm32l4xx_hal.h"
-#include "CAN.h"
+#include <CAN_LL.h>
 
 void CAN1_init(){
 

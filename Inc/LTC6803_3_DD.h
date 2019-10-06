@@ -5,8 +5,10 @@
  *      Author: Simos MCmuffin
  */
 
-#ifndef LTC6803_3_H_
-#define LTC6803_3_H_
+#ifndef LTC6803_3_DD_H_
+#define LTC6803_3_DD_H_
+
+#include <stdint.h>
 
 struct LTC6803_3{
 	uint8_t CFGR[6];				//LTC6803 configuration values
@@ -34,11 +36,11 @@ void LTC6803_convertCellVoltages(void);
 void LTC6803_convertOpenCellVoltages(void);
 void LTC6803_convertTemperatureVoltages(void);
 
-void LTC6803_baseFunction(void);
+void LTC6803_transactionHandler(uint64_t*);
 
 void LTC6803_setCellDischarge(uint8_t, uint8_t);
 uint16_t LTC6803_getCellVoltage(uint8_t);
 uint16_t LTC6803_getTemperature(void);
 uint8_t calculatePEC(uint8_t, uint8_t);
 
-#endif /* LTC6803_3_H_ */
+#endif /* LTC6803_3_DD_H_ */

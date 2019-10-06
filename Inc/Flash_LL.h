@@ -5,9 +5,8 @@
  *      Author: Simos MCmuffin
  */
 
-#ifndef LL_FLASH_H_
-#define LL_FLASH_H_
-
+#ifndef FLASH_LL_H_
+#define FLASH_LL_H_
 
 #define __FLASH_PAGE_62	(0x0801F000)
 #define __FLASH_PAGE_63	(0x0801F800)
@@ -18,4 +17,4 @@ uint8_t eraseFlashPage(uint8_t);
 uint8_t readFlash(void*, uint32_t, uint32_t);
 uint8_t writeFlashDword(uint32_t, uint64_t);
 
-#endif /* LL_FLASH_H_ */
+#endif /* FLASH_LL_H_ */
