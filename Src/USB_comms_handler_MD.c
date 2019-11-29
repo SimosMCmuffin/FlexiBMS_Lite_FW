@@ -37,8 +37,13 @@ void checkForNewMessages(){
 				case '$':
 					report_parameters(0, 1);
 					break;
-				case 'T':
-					//set live on
+				case 'R':
+					if( runtimePars.statePrintout == 0 ){
+						runtimePars.statePrintout = 1;
+					}
+					else{
+						runtimePars.statePrintout = 0;
+					}
 					break;
 				case 'F':
 					report_faults();
@@ -93,7 +98,7 @@ void checkForNewMessages(){
 		}
 	}
 
-	if( runtimePars.statusLive == 1 && runtimePars.usbConnected == 1 ){
+	if( runtimePars.statePrintout == 1 && runtimePars.usbConnected == 1 ){
 		if( liveTick < HAL_GetTick() ){
 			liveTick = HAL_GetTick() + runtimePars.statusTick;
 			report_state();
@@ -199,12 +204,14 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case stayActiveTime:
 		nonVolPars.genParas.stayActiveTime = (uint16_t)*value;
 		break;
+	case alwaysBalancing:
+		nonVolPars.genParas.alwaysBalancing = (uint16_t)*value;
+		break;
 	default:
 		report_error(error_invalidMessageID);
 		break;
 	}
 }
-
 
 void set_ADC_chan_gain(float* value, uint8_t channel){
 	nonVolPars.adcParas.ADC_chan_gain[channel] = *value;
@@ -238,7 +245,7 @@ void report_state(void){
 	uint8_t text[128] = {};
 	uint16_t pos = 0;
 
-	static const uint8_t Ftext1[] = {"\r\nState:"};
+	static const uint8_t Ftext1[] = {"State:"};
 	appendString(text, Ftext1, &pos);
 
 	for(uint8_t x=0; x<12; x++){
@@ -275,7 +282,14 @@ void report_state(void){
 	text[pos] = ':';
 	pos++;
 
-	while( CDC_Transmit_FS(text, pos) );
+	text[pos] = '\r';
+	pos++;
+	text[pos] = '\n';
+	pos++;
+
+	//Hexacopter's code got stuck here, seems like HW based problem, but change from halting execution
+	//while( CDC_Transmit_FS(text, pos) );
+	CDC_Transmit_FS(text, pos);
 }
 
 void report_help(){
@@ -283,6 +297,7 @@ void report_help(){
 							"\r\n"
 							"$? (command list)\r\n"
 							"$$ (view configurable parameters)\r\n"
+							"$R (turn BMS state report ON/OFF)\r\n"
 							"$F (view BMS faults)\r\n"
 							"$S (save parameters to EEPROM)\r\n"
 							"$L (load parameters from EEPROM)\r\n"
@@ -533,6 +548,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendUint16(text, nonVolPars.genParas.stayActiveTime, pos);
 		static const uint8_t description25[] = {" (not used ATM; h (Hours), how long to stay in active mode, Uint)\r\n"};
 		appendString(text, description25, pos);
+		break;
+	case alwaysBalancing:
+		appendUint16(text, nonVolPars.genParas.alwaysBalancing, pos);
+		static const uint8_t description31[] = {" (0/1, allow cell balancing outside of charging, Boolean)\r\n"};
+		appendString(text, description31, pos);
 		break;
 	default:
 		break;

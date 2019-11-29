@@ -29,6 +29,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->adcParas.AdcOversampling = 16;
 
 		nonVols->genParas.stayActiveTime = 1000;
+		nonVols->genParas.alwaysBalancing = 0;
 
 		nonVols->chgParas.packCellCount = 12;
 		nonVols->chgParas.cellBalVolt = 4150;
@@ -59,12 +60,19 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 
 void initRuntimeParameters(runtimeParameters* runtimePars){
 	runtimePars->ADCrunState = 0;
-	runtimePars->statusLive = 1;
+	runtimePars->statePrintout = 0;
 	runtimePars->statusTick = 1000;
 	runtimePars->usbConnected = 0;
 	runtimePars->chargingState = 0;
 	runtimePars->faults = 0;
+
 	runtimePars->buck5vEnabled = 0;
+	runtimePars->buck5vRequest = 0;
+	runtimePars->packVoltageEnabled = 0;
+	runtimePars->packVoltageRequest = 0;
+	runtimePars->chargerVoltageEnabled = 0;
+	runtimePars->chargerVoltageRequest = 0;
+
 	runtimePars->charging = 0;
 	runtimePars->balancing = 0;
 }
@@ -90,6 +98,7 @@ uint16_t highestCell(uint8_t cellCount){
 
 	return temp;
 }
+
 uint16_t lowestCell(uint8_t cellCount){
 	uint16_t temp = 60000;
 
@@ -108,13 +117,13 @@ uint8_t usbPowerPresent(void){		//Start and stop USB service depending on if 5V 
 		MX_USB_DEVICE_Init();
 		runtimePars.usbConnected = 1;
 		usb_state = 1;
-		//__BLUE_LED_ON;
+		runtimePars.buck5vRequest |= (1 << usb5vRequest);
 	}
 	else if( !(GPIOB->IDR & (1 << 7)) && usb_state == 1 ){
 		USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
 		runtimePars.usbConnected = 0;
 		usb_state = 0;
-		//__BLUE_LED_OFF;
+		runtimePars.buck5vRequest &= ~(1 << usb5vRequest);
 	}
 
 	return usb_state;
@@ -130,24 +139,28 @@ uint8_t chargeControl(){
 	static uint8_t chargingState = 0;
 	static uint64_t chargeTick = 0;
 
-	__ENABLE_CHARGER_VOLTAGE;
+	runtimePars.chargerVoltageRequest |= (1 << 0);
 	//check if charger detected
 	if( ADC_convertedResults[chargerVoltage] > nonVolPars.chgParas.minChgVolt ){
-		__ENABLE_5V_BUCK;
+		runtimePars.buck5vRequest |= (1 << charging5vRequest);		//request 5V buck
 
-		checkChargerVoltageFault();
-		checkBMStemperatureFault();
-		checkNTCtemperatureFault();
-		checkCellVoltageFaults();
 
-		if( nonVolPars.chgParas.packCellCount == 0 ){
-			checkPackVoltageFault();
-			__ENABLE_BAT_VOLTAGE;
-		}
+		if( runtimePars.buck5vEnabled == 1 ){						//if 5V buck enabled
+			checkChargerVoltageFault();
+			checkBMStemperatureFault();
+			checkNTCtemperatureFault();
+			checkCellVoltageFaults();
 
-		if( runtimePars.faults == 0 && chargingState == 0){
-			//allow charging to start
-			chargingState = 1;
+			if( nonVolPars.chgParas.packCellCount == 0 ){
+				checkPackVoltageFault();
+				runtimePars.packVoltageRequest |= (1 << 0);
+			}
+
+			if( runtimePars.faults == 0 && chargingState == 0){
+				//allow charging to start
+				runtimePars.packVoltageRequest |= (1 << 0);
+				chargingState = 1;
+			}
 		}
 
 	}
@@ -157,21 +170,34 @@ uint8_t chargeControl(){
 	}
 
 	//balancing
-	if( chargingState != 0 && nonVolPars.chgParas.packCellCount != 0 ){	//allow balancing if chargingState != 0
+	if( 	(chargingState != 0 && nonVolPars.chgParas.packCellCount != 0) ||
+			(nonVolPars.genParas.alwaysBalancing == 1 && nonVolPars.chgParas.packCellCount != 0) ){
 
 		runtimePars.balancing = 0;
 		for(uint8_t x=0; x < nonVolPars.chgParas.packCellCount; x++){
 			if( 	(LTC6803_getCellVoltage(x) >= nonVolPars.chgParas.cellBalVolt) &&						//if cell voltage above balance voltage
 					(LTC6803_getCellVoltage(x) > (lowestCell(nonVolPars.chgParas.packCellCount) + nonVolPars.chgParas.cellDiffVolt)) ){	//and cell difference greater than allowed compared to the lowest cell
-				LTC6803_setCellDischarge(x, 1);
-				runtimePars.balancing = 1;
+
+				runtimePars.balancing++;
+
+				if( runtimePars.balancing <= 5 ){	//allow max of 5 resistors to balance, to help reduce the thermal generation
+					LTC6803_setCellDischarge(x, 1);
+				}
 			}
 			else
 				LTC6803_setCellDischarge(x, 0);
 		}
 
+		if( runtimePars.balancing > 0 ){
+			runtimePars.buck5vRequest |= (1 << balancing5vRequest);
+		}
+		else{
+			runtimePars.buck5vRequest &= ~(1 << balancing5vRequest);
+		}
+
 	}
-	else{												//if chargingState == 0, stop balancing
+	else{												//stop balancing
+		runtimePars.balancing = 0;
 		for(uint8_t x=0; x<12; x++){
 			LTC6803_setCellDischarge(x, 0);
 		}
@@ -180,10 +206,9 @@ uint8_t chargeControl(){
 
 	switch(chargingState){
 	case 0:
-		__DISABLE_5V_BUCK;
-		__DISABLE_BAT_VOLTAGE;
+		runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
+		runtimePars.packVoltageRequest &= ~(1 << 0);
 		__DISABLE_CHG;
-		runtimePars.balancing = 0;
 		runtimePars.charging = 0;
 		break;
 
@@ -265,8 +290,7 @@ uint8_t chargeControl(){
 		__DISABLE_CHG;
 		runtimePars.charging = 0;
 		if( ADC_convertedResults[chargerVoltage] < nonVolPars.chgParas.minChgVolt ){
-			__DISABLE_BAT_VOLTAGE;
-			__DISABLE_5V_BUCK;
+			runtimePars.packVoltageRequest &= ~(1 << 0);
 			chargeTick = HAL_GetTick() + 250;
 			chargingState = 4;
 		}
@@ -286,57 +310,126 @@ uint8_t chargeControl(){
 	return chargingState;
 }
 
-void statusLed(void){
-	static uint64_t statusLedTick = 0;
-	static uint8_t state = 0;
+void hwRequestControl(void){
 
-	if( statusLedTick < HAL_GetTick() ){
-		statusLedTick = HAL_GetTick() + 1000;
-
-		if( runtimePars.usbConnected == 1 && (runtimePars.charging || runtimePars.balancing) ){
-			if( state == 0 )
-				state = 1;
-			else
-				state = 0;
-		}
-		else{
-			if( runtimePars.usbConnected == 1 ){
-				state = 0;
-			}
-			else{
-				state = 1;
-			}
-		}
+	if( runtimePars.buck5vRequest > 0 ){
+		__ENABLE_5V_BUCK;
+		runtimePars.buck5vEnabled = 1;
+	}
+	else{
+		__DISABLE_5V_BUCK;
+		runtimePars.buck5vEnabled = 0;
 	}
 
-	if( state == 0 ){
-		__RED_LED_OFF;
-		__GREEN_LED_OFF;
-		if( runtimePars.usbConnected == 1 ){
-			__BLUE_LED_ON;
+	if( runtimePars.packVoltageRequest > 0 ){
+		__ENABLE_BAT_VOLTAGE;
+		runtimePars.packVoltageEnabled = 1;
+	}
+	else{
+		__DISABLE_BAT_VOLTAGE;
+		runtimePars.packVoltageEnabled = 0;
+	}
+
+	if( runtimePars.chargerVoltageRequest > 0 ){
+		__ENABLE_CHARGER_VOLTAGE;
+		runtimePars.chargerVoltageEnabled = 1;
+	}
+	else{
+		__DISABLE_CHARGER_VOLTAGE;
+		runtimePars.chargerVoltageEnabled = 0;
+	}
+
+}
+
+void statusLed(void){
+	static uint64_t statusLedTick = 0;
+	static uint8_t state = 0, bootDone = 0;
+
+	if( bootDone <= 7 ){	//Boot LED color animation
+		runtimePars.buck5vRequest |= (1 << led5vRequest);	//request 5V buck on, so can use LED
+
+		if( statusLedTick < HAL_GetTick() ){
+			statusLedTick = HAL_GetTick() + 300;
+
+			switch(bootDone){
+			case 0: __GREEN_LED_ON; __RED_LED_OFF; __BLUE_LED_OFF; bootDone++; break;	//green
+			case 1: __GREEN_LED_OFF; __RED_LED_ON; __BLUE_LED_OFF; bootDone++; break;	//red
+			case 2: __GREEN_LED_OFF; __RED_LED_OFF; __BLUE_LED_ON; bootDone++; break;	//blue
+
+			case 3: __GREEN_LED_ON; __RED_LED_ON; __BLUE_LED_OFF; bootDone++; break;	//yellow
+			case 4: __GREEN_LED_OFF; __RED_LED_ON; __BLUE_LED_ON; bootDone++; break;	//magenta
+			case 5: __GREEN_LED_ON; __RED_LED_OFF; __BLUE_LED_ON; bootDone++; break;	//cyan
+
+			case 6: __GREEN_LED_ON; __RED_LED_ON; __BLUE_LED_ON; bootDone++; break;		//white
+
+			default: __GREEN_LED_OFF; __RED_LED_OFF; __BLUE_LED_OFF; bootDone++;		//off
+						runtimePars.buck5vRequest &= ~(1 << led5vRequest); break;		//remove 5V buck request
+			}
+		}
+
+	}
+	else{				//Normal LED operation
+
+		if( statusLedTick < HAL_GetTick() ){
+			statusLedTick = HAL_GetTick() + 1000;
+
+			if( runtimePars.usbConnected == 1 && (runtimePars.charging || runtimePars.balancing) ){
+				if( state == 0 )
+					state = 1;
+				else
+					state = 0;
+			}
+			else{
+				if( runtimePars.usbConnected == 1 ){
+					state = 0;
+				}
+				else{
+					state = 1;
+				}
+			}
+		}
+
+
+		if( state == 0 ){
+			__RED_LED_OFF;
+			__GREEN_LED_OFF;
+			if( runtimePars.usbConnected == 1 ){
+				__BLUE_LED_ON;
+			}
+			else{
+				__BLUE_LED_OFF;
+			}
 		}
 		else{
 			__BLUE_LED_OFF;
+			if( runtimePars.balancing > 0 ){
+				__GREEN_LED_ON;
+				__RED_LED_ON;
+			}
+			else if( runtimePars.charging == 1 ){
+				__GREEN_LED_ON;
+				__RED_LED_OFF;
+			}
+			else{
+				__GREEN_LED_OFF;
+				__RED_LED_OFF;
+			}
 		}
-	}
-	else{
-		__BLUE_LED_OFF;
-		if( runtimePars.balancing == 1 ){
-			__GREEN_LED_ON;
-			__RED_LED_ON;
-		}
-		else if( runtimePars.charging == 1 ){
-			__GREEN_LED_ON;
-			__RED_LED_OFF;
-		}
-		else{
-			__GREEN_LED_OFF;
-			__RED_LED_OFF;
-		}
-
 
 	}
 
+}
+
+void jumpToBootloader(void){
+	//de-init all peripherals
+
+	//check oscillator status
+
+	//jump to STM bootloader
+	asm("ldr r0, =0x1FFF0000"); //load R0 register with constant value 0x1FFF 0000, in this case the beginning of STM bootloader
+	asm("ldr sp, [r0, #0]");	//load SP with value that R0 points to	*0x1FFF 0000 (End of stack)
+	asm("ldr r0, [r0, #4]");	//load R0 with value R0 + 4 points to *0x1FFF 0004 (Reset Vector)
+	asm("bx r0");				//jump there
 }
 
 void checkChargerVoltageFault(){

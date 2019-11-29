@@ -2,47 +2,9 @@
  ******************************************************************************
  * File Name          : main.c
  * Description        : Main program body
+ * Author			  : Simo Sihvonen (Simos MCmuffin)
  ******************************************************************************
- * This notice applies to any and all portions of this file
- * that are not between comment pairs USER CODE BEGIN and
- * USER CODE END. Other portions of this file, whether
- * inserted by the user or by software development tools
- * are owned by their respective copyright owners.
- *
- * Copyright (c) 2019 STMicroelectronics International N.V.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted, provided that the following conditions are met:
- *
- * 1. Redistribution of source code must retain the above copyright notice,
- *    this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright notice,
- *    this list of conditions and the following disclaimer in the documentation
- *    and/or other materials provided with the distribution.
- * 3. Neither the name of STMicroelectronics nor the names of other
- *    contributors to this software may be used to endorse or promote products
- *    derived from this software without specific written permission.
- * 4. This software, including modifications and/or derivative works of this
- *    software, must execute solely and exclusively on microcontroller or
- *    microprocessor devices manufactured by or for STMicroelectronics.
- * 5. Redistribution and use of this software other than as permitted under
- *    this license is void and will automatically terminate your rights under
- *    this license.
- *
- * THIS SOFTWARE IS PROVIDED BY STMICROELECTRONICS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS, IMPLIED OR STATUTORY WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
- * PARTICULAR PURPOSE AND NON-INFRINGEMENT OF THIRD PARTY INTELLECTUAL PROPERTY
- * RIGHTS ARE DISCLAIMED TO THE FULLEST EXTENT PERMITTED BY LAW. IN NO EVENT
- * SHALL STMICROELECTRONICS OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
- * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA,
- * OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
- * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *ä
+
  ******************************************************************************
  */
 /* Includes ------------------------------------------------------------------*/
@@ -69,23 +31,23 @@ runtimeParameters runtimePars;
 
 int main(void)
 {
-	initNonVolatiles(&nonVolPars, 0);
-	initRuntimeParameters(&runtimePars);
+	initNonVolatiles(&nonVolPars, 0);		//init/load non-volatile parameters
+	initRuntimeParameters(&runtimePars);	//init default runtime parameters
 
-	HAL_Init();
+	HAL_Init();						//init ST's HAL core
 
-	SystemClock_Config();
+	SystemClock_Config();			//init oscillators
 
-	GPIO_Init();
-	MX_USB_DEVICE_Init();
-	SPI1_init();
-	LTC6803_init();
-	ADC_init();
-	CAN1_init();
+	GPIO_Init();					//Init GPIO in-/outputs
+	MX_USB_DEVICE_Init();			//init ST's CDC (VCP) USB stack
+	SPI1_init();					//init SPI1 low level HW
+	LTC6803_init();					//init LTC6803 device driver
+	ADC_init();						//init ADC low level HW
+	CAN1_init();					//init CAN low level HW
 
 	USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
 
-	if( runtimePars.ADCrunState == 0 ){	//
+	if( runtimePars.ADCrunState == 0 ){	//setup and start ADC sampling and conversion
 		ADC_setupSequence();
 		ADC_runSequence();
 	}
@@ -95,18 +57,20 @@ int main(void)
 	while (1)
 	{
 
-		if( systemTick + 20 <= HAL_GetTick() ){
+		if( systemTick + 20 <= HAL_GetTick() ){		//go in here at max every 20ms
 			systemTick = HAL_GetTick();
 
-			usbPowerPresent();
+			usbPowerPresent();		//Init/deInit USB based on if 5V is detected from the USB connector
 
 		}
 
-		statusLed();
+		statusLed();		//Control status LED
 
-		chargeControl();
+		hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
 
-		checkForNewMessages();
+		chargeControl();	//charging algorithm, everything charging control related is done through here
+
+		checkForNewMessages();		//check for new messages from USB and send State printout if enabled
 
 		if( LTC6803tick <= HAL_GetTick() ){		//all LTC6803 SPI communications are started from this tick function
 			LTC6803tick = HAL_GetTick() + 5;
@@ -177,13 +141,13 @@ static void GPIO_Init(void)
 	__HAL_RCC_GPIOB_CLK_ENABLE();
 
 	GPIOB->MODER = GPIOB->MODER & ~(3 << 0);	//5V_BUCK_ENABLE
-	__ENABLE_5V_BUCK;
+	//__ENABLE_5V_BUCK;
 	//__DISABLE_5V_BUCK;
 
 	GPIOB->MODER &= ~((3 << 24) | (3 << 4));		//PMON_ENABLE & BAT_VOLTAGE_ENABLE
 	GPIOB->MODER |= (1 << 24) | (1 << 4);
-	__ENABLE_BAT_VOLTAGE;
-	__ENABLE_CHARGER_VOLTAGE;
+	//__ENABLE_BAT_VOLTAGE;
+	//__ENABLE_CHARGER_VOLTAGE;
 
 	GPIOB->MODER &= ~( (3 << 26) | (3 << 28) | (3 << 30) );		//Status led pins PB13, PB14, PB15
 	GPIOB->MODER |=  (1 << 26) | (1 << 28) | (1 << 30);

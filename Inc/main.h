@@ -87,6 +87,15 @@ typedef enum
 	fault_numberOfElements
 }_fault_ID;
 
+typedef enum
+{
+	usb5vRequest = 0,
+	charging5vRequest,
+	ntc5vRequest,
+	led5vRequest,
+	balancing5vRequest
+}_5vRequest_ID;
+
 typedef struct _chargingParameters {
 	uint16_t packCellCount;	//# number of series cells in the battery pack
 	uint16_t maxChgCurr;	//mA (milliAmps), maximum current allowed to flow to battery
@@ -121,6 +130,7 @@ typedef struct _ADCparameters {
 
 typedef struct _generalParameters {
 	uint16_t stayActiveTime;	//h (Hours), how long to stay in active mode
+	uint16_t alwaysBalancing;	//1 or 0, allow balancing even when not charging
 } generalParameters;
 
 typedef struct _nonVolParameters {
@@ -130,15 +140,23 @@ typedef struct _nonVolParameters {
 } nonVolParameters;
 
 typedef struct _runtimeParameters {
-	uint16_t statusLive;
+	uint16_t statePrintout;
 	uint16_t statusTick;
 	uint16_t ADCrunState;
 	uint16_t usbConnected;
 	uint16_t chargingState;
 	uint64_t faults;
+
 	uint16_t buck5vEnabled;
+	uint16_t buck5vRequest;
+	uint16_t packVoltageEnabled;
+	uint16_t packVoltageRequest;
+	uint16_t chargerVoltageEnabled;
+	uint16_t chargerVoltageRequest;
+
 	uint16_t charging;
 	uint16_t balancing;
+
 } runtimeParameters;
 
 void Error_Handler(void);

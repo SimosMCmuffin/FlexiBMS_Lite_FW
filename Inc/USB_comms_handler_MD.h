@@ -29,6 +29,7 @@ typedef enum
 	maxNTCtemp,
 	minBMStemp,
 	maxBMStemp,
+	alwaysBalancing,
 	tickInterval,
 
 	ADC_chan_gain_0,
