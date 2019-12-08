@@ -206,7 +206,6 @@ uint8_t chargeControl(){
 
 	switch(chargingState){
 	case 0:
-		runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 		runtimePars.packVoltageRequest &= ~(1 << 0);
 		__DISABLE_CHG;
 		runtimePars.charging = 0;
@@ -298,6 +297,7 @@ uint8_t chargeControl(){
 
 	case 4:
 		if( chargeTick <= HAL_GetTick() )
+			runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 			chargingState = 0;
 		break;
 
@@ -312,7 +312,7 @@ uint8_t chargeControl(){
 
 void hwRequestControl(void){
 
-	if( runtimePars.buck5vRequest > 0 ){
+	if( runtimePars.buck5vRequest > 0 ){	//enable 5V buck, if there are requests for the 5V rail
 		__ENABLE_5V_BUCK;
 		runtimePars.buck5vEnabled = 1;
 	}
@@ -321,7 +321,7 @@ void hwRequestControl(void){
 		runtimePars.buck5vEnabled = 0;
 	}
 
-	if( runtimePars.packVoltageRequest > 0 ){
+	if( runtimePars.packVoltageRequest > 0 ){	//enable pack voltage resistive divider, if there are requests for pack voltage
 		__ENABLE_BAT_VOLTAGE;
 		runtimePars.packVoltageEnabled = 1;
 	}
@@ -330,7 +330,7 @@ void hwRequestControl(void){
 		runtimePars.packVoltageEnabled = 0;
 	}
 
-	if( runtimePars.chargerVoltageRequest > 0 ){
+	if( runtimePars.chargerVoltageRequest > 0 ){	//enable charger voltage resistive divider, if there are requests for charger voltage
 		__ENABLE_CHARGER_VOLTAGE;
 		runtimePars.chargerVoltageEnabled = 1;
 	}
