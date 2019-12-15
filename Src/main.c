@@ -26,13 +26,14 @@ extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 
 volatile uint8_t runMode = 0;
 
-//const FW_VERSION uint8[] = {"FW_0001"};
+const uint8_t FW_VERSION[] = {"FW_0002_WIP_DEBUG"};
 
 nonVolParameters nonVolPars;
 runtimeParameters runtimePars;
 
 int main(void)
 {
+
 	initNonVolatiles(&nonVolPars, 0);		//init/load non-volatile parameters
 	initRuntimeParameters(&runtimePars);	//init default runtime parameters
 
@@ -55,6 +56,7 @@ int main(void)
 	}
 
 	uint64_t systemTick = HAL_GetTick(), LTC6803tick = HAL_GetTick();
+
 
 	while (1)
 	{

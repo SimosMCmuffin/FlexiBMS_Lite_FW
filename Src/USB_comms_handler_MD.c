@@ -12,9 +12,11 @@
 #include <LTC6803_3_DD.h>
 
 
-
 #define APP_RX_DATA_SIZE  64
 
+extern void jumpToBootloader(void);
+
+extern const uint8_t FW_VERSION[];
 extern nonVolParameters nonVolPars;
 extern runtimeParameters runtimePars;
 
@@ -47,6 +49,12 @@ void checkForNewMessages(){
 					break;
 				case 'F':
 					report_faults();
+					break;
+				case 'B':
+					jumpToBootloader();
+					break;
+				case 'W':
+					report_firmware();
 					break;
 				case 'S':
 					saveNonVolatileParameters(&nonVolPars);
@@ -241,6 +249,23 @@ void report_faults(void){
 	while( CDC_Transmit_FS(text, pos) );
 }
 
+void report_firmware(void){
+	uint8_t text[64] = {};
+	uint16_t pos = 0;
+
+	static const uint8_t Ftext1[] = {"FW version: "};
+	appendString(text, Ftext1, &pos);
+	appendString(text, FW_VERSION, &pos);
+
+	text[pos] = '\r';
+	pos++;
+	text[pos] = '\n';
+	pos++;
+
+	CDC_Transmit_FS(text, pos);
+
+}
+
 void report_state(void){
 	uint8_t text[128] = {};
 	uint16_t pos = 0;
@@ -287,8 +312,6 @@ void report_state(void){
 	text[pos] = '\n';
 	pos++;
 
-	//Hexacopter's code got stuck here, seems like HW based problem, but change from halting execution
-	//while( CDC_Transmit_FS(text, pos) );
 	CDC_Transmit_FS(text, pos);
 }
 
@@ -299,6 +322,8 @@ void report_help(){
 							"$$ (view configurable parameters)\r\n"
 							"$R (turn BMS state report ON/OFF)\r\n"
 							"$F (view BMS faults)\r\n"
+							"$W (print FW version)\r\n"
+							"$B (jump into bootloader)\r\n"
 							"$S (save parameters to EEPROM)\r\n"
 							"$L (load parameters from EEPROM)\r\n"
 							"$D (load default parameters)\r\n\r\n"
