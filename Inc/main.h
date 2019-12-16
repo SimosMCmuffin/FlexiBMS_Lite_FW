@@ -93,7 +93,8 @@ typedef enum
 	charging5vRequest,
 	ntc5vRequest,
 	led5vRequest,
-	balancing5vRequest
+	balancing5vRequest,
+	always5vRequest
 }_5vRequest_ID;
 
 typedef struct _chargingParameters {
@@ -131,6 +132,7 @@ typedef struct _ADCparameters {
 typedef struct _generalParameters {
 	uint16_t stayActiveTime;	//h (Hours), how long to stay in active mode
 	uint16_t alwaysBalancing;	//1 or 0, allow balancing even when not charging
+	uint16_t always5vRequest;	//1 or 0, force 5V buck always on
 } generalParameters;
 
 typedef struct _nonVolParameters {

@@ -215,6 +215,10 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case alwaysBalancing:
 		nonVolPars.genParas.alwaysBalancing = (uint16_t)*value;
 		break;
+	case keep5ValwaysOn:
+		nonVolPars.genParas.always5vRequest = (uint16_t)*value;
+		runtimePars.buck5vRequest = ((uint16_t)*value << always5vRequest);
+		break;
 	default:
 		report_error(error_invalidMessageID);
 		break;
@@ -578,6 +582,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendUint16(text, nonVolPars.genParas.alwaysBalancing, pos);
 		static const uint8_t description31[] = {" (0/1, allow cell balancing outside of charging, Boolean)\r\n"};
 		appendString(text, description31, pos);
+		break;
+	case keep5ValwaysOn:
+		appendUint16(text, nonVolPars.genParas.always5vRequest, pos);
+		static const uint8_t description32[] = {" (0/1, force 5V regulator always on when battery connected, Boolean)\r\n"};
+		appendString(text, description32, pos);
 		break;
 	default:
 		break;

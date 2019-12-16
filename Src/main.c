@@ -47,6 +47,7 @@ int main(void)
 	LTC6803_init();					//init LTC6803 device driver
 	ADC_init();						//init ADC low level HW
 	CAN1_init();					//init CAN low level HW
+	CAN1_setupRxFilters();			//init CAN RX ID filters
 
 	USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
 
@@ -67,6 +68,8 @@ int main(void)
 			usbPowerPresent();		//Init/deInit USB based on if 5V is detected from the USB connector
 
 		}
+
+		CAN1_debugEcho();
 
 		statusLed();		//Control status LED
 

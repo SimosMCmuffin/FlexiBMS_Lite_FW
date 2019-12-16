@@ -30,6 +30,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 
 		nonVols->genParas.stayActiveTime = 1000;
 		nonVols->genParas.alwaysBalancing = 0;
+		nonVols->genParas.always5vRequest = 0;
 
 		nonVols->chgParas.packCellCount = 12;
 		nonVols->chgParas.cellBalVolt = 4150;
@@ -68,6 +69,7 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 
 	runtimePars->buck5vEnabled = 0;
 	runtimePars->buck5vRequest = 0;
+	runtimePars->buck5vRequest |= (nonVolPars.genParas.always5vRequest << always5vRequest);
 	runtimePars->packVoltageEnabled = 0;
 	runtimePars->packVoltageRequest = 0;
 	runtimePars->chargerVoltageEnabled = 0;

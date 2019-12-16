@@ -46,6 +46,7 @@ typedef enum
 	AdcOversampling,
 
 	stayActiveTime,
+	keep5ValwaysOn,
 
 	numberOfElements
 }_parameter_ID;
