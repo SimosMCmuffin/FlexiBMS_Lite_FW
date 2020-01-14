@@ -5,8 +5,16 @@
  *      Author: Simos MCmuffin
  */
 
-#include "stm32l4xx_hal.h"
-#include <CAN_LL.h>
+#include <stm32l4xx_hal.h>
+#include "CAN_LL.h"
+#include "commands.h"
+#include "config.h"
+#include "crc.h"
+#include "datatypes.h"
+#include "usbd_cdc_if_ST.h"  // FIXME: delete once debugging prints longer needed
+#include "USB_comms_handler_MD.h"  // FIXME: delete once debugging prints longer needed
+
+static unsigned int rx_buffer_last_id;
 
 void CAN1_init(){
 
@@ -42,6 +50,7 @@ uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 		uint8_t TX_empty = (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
 
 		CAN1->sTxMailBox[TX_empty].TIR = 0;
+		// TODO: make sure EID is used
 		CAN1->sTxMailBox[TX_empty].TIR = (ID << 21);	//set CAN ID
 		CAN1->sTxMailBox[TX_empty].TDTR = 0;
 		CAN1->sTxMailBox[TX_empty].TDTR = (length << 0);	//set data length
@@ -102,21 +111,6 @@ void CAN1_setupRxFilters(){
 	CAN1->FMR = 0;		//filter active mode
 }
 
-void CAN1_debugEcho(){
-	//check if CAN messages available in any RX mailbox and send first one back into bus with identical information
-
-	if( CAN1_rxAvailable() ){
-		uint8_t length = 0, data[8] = {0};
-		uint32_t ID = 0;
-
-		CAN1_receive(&ID, data, &length);
-		ID = ID >> 21;
-
-		CAN1_transmit(ID, data, length);
-	}
-
-}
-
 uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 	//check if mail available in either RX mailbox, if not return 0
 
@@ -154,4 +148,98 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 		return 0;
 	}
 
+}
+
+void comm_can_send_buffer(uint8_t controller_id, uint8_t *data, unsigned int len, uint8_t send) {
+	uint8_t send_buffer[8];
+
+	if (len <= 6) {
+		uint8_t ind = 0;
+		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = send;
+		memcpy(send_buffer + ind, data, len);
+		ind += len;
+		CAN1_transmit(controller_id |
+				((uint32_t)CAN_PACKET_PROCESS_SHORT_BUFFER << 8), send_buffer, ind);
+	} else {
+		unsigned int end_a = 0;
+		for (unsigned int i = 0;i < len;i += 7) {
+			if (i > 255) {
+				break;
+			}
+
+			end_a = i + 7;
+
+			uint8_t send_len = 7;
+			send_buffer[0] = i;
+
+			if ((i + 7) <= len) {
+				memcpy(send_buffer + 1, data + i, send_len);
+			} else {
+				send_len = len - i;
+				memcpy(send_buffer + 1, data + i, send_len);
+			}
+
+			CAN1_transmit(controller_id |
+					((uint32_t)CAN_PACKET_FILL_RX_BUFFER << 8), send_buffer, send_len + 1);
+		}
+
+		for (unsigned int i = end_a;i < len;i += 6) {
+			uint8_t send_len = 6;
+			send_buffer[0] = i >> 8;
+			send_buffer[1] = i & 0xFF;
+
+			if ((i + 6) <= len) {
+				memcpy(send_buffer + 2, data + i, send_len);
+			} else {
+				send_len = len - i;
+				memcpy(send_buffer + 2, data + i, send_len);
+			}
+
+			CAN1_transmit(controller_id |
+					((uint32_t)CAN_PACKET_FILL_RX_BUFFER_LONG << 8), send_buffer, send_len + 2);
+		}
+
+		uint32_t ind = 0;
+		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = send;
+		send_buffer[ind++] = len >> 8;
+		send_buffer[ind++] = len & 0xFF;
+		unsigned short crc = crc16(data, len);
+		send_buffer[ind++] = (uint8_t)(crc >> 8);
+		send_buffer[ind++] = (uint8_t)(crc & 0xFF);
+
+		CAN1_transmit(controller_id |
+				((uint32_t)CAN_PACKET_PROCESS_RX_BUFFER << 8), send_buffer, ind++);
+	}
+}
+
+static void send_packet_wrapper(unsigned char *data, unsigned int len) {
+	comm_can_send_buffer(rx_buffer_last_id, data, len, 1);
+}
+
+
+void CAN1_process_message() {
+	if (!CAN1_rxAvailable())
+		return;
+
+	uint8_t length = 0, data[8] = {0};
+	uint32_t id = 0;
+	CAN1_receive(&id, data, &length);
+
+	if (id != 16468)  // FIXME: This seems to indicate controller_id==10 and packet_type==CAN_PACKET_PROCESS_SHORT_BUFFER.
+		return;
+
+	if (length < 3)
+		return;
+
+	rx_buffer_last_id = data[0];
+	uint8_t commands_send = data[1];
+
+	// assuming CAN_PACKET_PROCESS_SHORT_BUFFER
+	if (commands_send == 0) {
+		commands_process_packet(data + 2, length - 2, send_packet_wrapper);
+	}
+
+	// Nothing to do for commands_send==1 (forward) and commands_send==2 (process without responding) for now.
 }
