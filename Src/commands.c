@@ -42,8 +42,8 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		send_buffer[ind++] = FW_VERSION_MINOR;
 		strcpy((char*)(send_buffer + ind), HW_NAME);
 		ind += strlen(HW_NAME) + 1;
-		memcpy(send_buffer + ind, STM32_UUID_8, 12);
-		ind += 12;
+		//memcpy(send_buffer + ind, STM32_UUID_8, 12);
+		//ind += 12;
 
 		commands_send_packet(send_buffer, ind);
 		break;
