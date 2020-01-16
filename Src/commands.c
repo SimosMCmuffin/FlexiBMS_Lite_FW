@@ -30,6 +30,8 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		return;
 	}
 
+	send_func = reply_func;
+
 	int32_t ind = 0;
 	uint8_t send_buffer[128];
 
