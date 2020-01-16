@@ -11,6 +11,15 @@
 
 static void(* volatile send_func)(unsigned char *data, unsigned int len) = 0;
 
+uint8_t cell_count() {
+	for (uint8_t i = 0; i < MAX_CELLS; i++) {
+		if (LTC6803_getCellVoltage(i) == 0)
+			return i;
+	}
+
+	return MAX_CELLS;
+}
+
 /**
  * Send a packet using the set send function.
  */
@@ -89,8 +98,9 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 	case COMM_GET_BMS_CELLS:
 		send_buffer[ind++] = COMM_GET_BMS_CELLS;
 
-		send_buffer[ind++] = MAX_CELLS;
-		for (int i = 0; i < MAX_CELLS; i++) {
+		uint8_t cells = cell_count();
+		send_buffer[ind++] = cells;
+		for (int i = 0; i < cells; i++) {
 			// TODO: multiply by -1 if balancing the cell
 			buffer_append_uint16(send_buffer, LTC6803_getCellVoltage(i), &ind);
 		}
