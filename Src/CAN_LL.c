@@ -6,6 +6,8 @@
  */
 
 #include <stm32l4xx_hal.h>
+#include <stdio.h>
+#include <string.h>
 #include "CAN_LL.h"
 #include "commands.h"
 #include "config.h"
