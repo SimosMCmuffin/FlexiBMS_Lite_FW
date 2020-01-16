@@ -11,8 +11,8 @@
 #include "config.h"
 #include "crc.h"
 #include "datatypes.h"
-#include "usbd_cdc_if_ST.h"  // FIXME: delete once debugging prints longer needed
-#include "USB_comms_handler_MD.h"  // FIXME: delete once debugging prints longer needed
+
+#define CAN_TRANSMIT_MAX_ATTEMPTS 100
 
 static unsigned int rx_buffer_last_id;
 
@@ -44,14 +44,13 @@ void CAN1_deInit(){
 
 }
 
-uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
+uint8_t CAN1_attempt_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 
 	if( !!(CAN1->TSR & (7 << 26)) ){		//Check that at least one TX mailbox is empty
 		uint8_t TX_empty = (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
 
 		CAN1->sTxMailBox[TX_empty].TIR = 0;
-		// TODO: make sure EID is used
-		CAN1->sTxMailBox[TX_empty].TIR = (ID << 21);	//set CAN ID
+		CAN1->sTxMailBox[TX_empty].TIR = (ID << 3) | (1 << 2);	//set CAN ID
 		CAN1->sTxMailBox[TX_empty].TDTR = 0;
 		CAN1->sTxMailBox[TX_empty].TDTR = (length << 0);	//set data length
 
@@ -81,8 +80,15 @@ uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 		return 0;		//return 0 to indicate failure
 	}
 
-
 	return 1;
+}
+
+uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
+	for (uint8_t i = 0; i < CAN_TRANSMIT_MAX_ATTEMPTS; i++) {
+		if (CAN1_attempt_transmit(ID, data, length))
+			return 1;
+	}
+	return 0;
 }
 
 uint8_t CAN1_rxAvailable(){		//check if CAN RX packets available
