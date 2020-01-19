@@ -123,10 +123,10 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 	//check if mail available in either RX mailbox, if not return 0
 
 	if( (CAN1->RF0R & (3 << 0)) != 0 ){
-	    if (CAN1->sFIFOMailBox[0].RIR & (1 << 2))
-            *ID = CAN1->sFIFOMailBox[0].RIR >> 3;  // extended ID
-        else
-            *ID = CAN1->sFIFOMailBox[0].RIR >> 21;  // standard ID
+		if (CAN1->sFIFOMailBox[0].RIR & (1 << 2))
+			*ID = CAN1->sFIFOMailBox[0].RIR >> 3;  // extended ID
+		else
+			*ID = CAN1->sFIFOMailBox[0].RIR >> 21;  // standard ID
 
 		*length = CAN1->sFIFOMailBox[0].RDTR & (0xF << 0);	//read/extract data length
 
@@ -142,10 +142,10 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 		return 1;
 	}
 	else if( (CAN1->RF1R & (3 << 0)) != 0 ){
-        if (CAN1->sFIFOMailBox[1].RIR & (1 << 2))
-            *ID = CAN1->sFIFOMailBox[1].RIR >> 3;  // extended ID
-        else
-            *ID = CAN1->sFIFOMailBox[1].RIR >> 21;  // standard ID
+		if (CAN1->sFIFOMailBox[1].RIR & (1 << 2))
+			*ID = CAN1->sFIFOMailBox[1].RIR >> 3;  // extended ID
+		else
+			*ID = CAN1->sFIFOMailBox[1].RIR >> 21;  // standard ID
 
 		*length = CAN1->sFIFOMailBox[1].RDTR & (0xF << 0);	//read/extract data length
 
@@ -243,8 +243,8 @@ void CAN1_process_message() {
 	uint32_t id = 0;
 	CAN1_receive(&id, data, &length);
 
-    uint8_t controller_id = id & 0xFF;
-    CAN_PACKET_ID cmd = id >> 8;
+	uint8_t controller_id = id & 0xFF;
+	CAN_PACKET_ID cmd = id >> 8;
 
 	if (controller_id != CAN_ID || cmd != CAN_PACKET_PROCESS_SHORT_BUFFER)
 		return;
