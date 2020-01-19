@@ -123,7 +123,11 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 	//check if mail available in either RX mailbox, if not return 0
 
 	if( (CAN1->RF0R & (3 << 0)) != 0 ){
-		*ID = CAN1->sFIFOMailBox[0].RIR;
+	    if (CAN1->sFIFOMailBox[0].RIR & (1 << 2))
+            *ID = CAN1->sFIFOMailBox[0].RIR >> 3;  // extended ID
+        else
+            *ID = CAN1->sFIFOMailBox[0].RIR >> 21;  // standard ID
+
 		*length = CAN1->sFIFOMailBox[0].RDTR & (0xF << 0);	//read/extract data length
 
 		for(uint8_t x=0; x<4; x++){			//read/extract lower 4 bytes into buffer
@@ -138,7 +142,11 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 		return 1;
 	}
 	else if( (CAN1->RF1R & (3 << 0)) != 0 ){
-		*ID = CAN1->sFIFOMailBox[1].RIR;
+        if (CAN1->sFIFOMailBox[1].RIR & (1 << 2))
+            *ID = CAN1->sFIFOMailBox[1].RIR >> 3;  // extended ID
+        else
+            *ID = CAN1->sFIFOMailBox[1].RIR >> 21;  // standard ID
+
 		*length = CAN1->sFIFOMailBox[1].RDTR & (0xF << 0);	//read/extract data length
 
 		for(uint8_t x=0; x<4; x++){			//read/extract lower 4 bytes into buffer
@@ -235,7 +243,10 @@ void CAN1_process_message() {
 	uint32_t id = 0;
 	CAN1_receive(&id, data, &length);
 
-	if (id != 16468)  // FIXME: This seems to indicate controller_id==10 and packet_type==CAN_PACKET_PROCESS_SHORT_BUFFER.
+    uint8_t controller_id = id & 0xFF;
+    CAN_PACKET_ID cmd = id >> 8;
+
+	if (controller_id != CAN_ID || cmd != CAN_PACKET_PROCESS_SHORT_BUFFER)
 		return;
 
 	if (length < 3)
@@ -244,7 +255,6 @@ void CAN1_process_message() {
 	rx_buffer_last_id = data[0];
 	uint8_t commands_send = data[1];
 
-	// assuming CAN_PACKET_PROCESS_SHORT_BUFFER
 	if (commands_send == 0) {
 		commands_process_packet(data + 2, length - 2, send_packet_wrapper);
 	}
