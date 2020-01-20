@@ -7,6 +7,8 @@
 #include "ADC_LL.h"
 #include "LTC6803_3_DD.h"
 
+#define CELSIUS_TO_KELVIN_1E1 2732  // add 273.2 to Celsius to get Kelvin
+
 //extern runtimeParameters runtimePars;
 
 static void(* volatile send_func)(unsigned char *data, unsigned int len) = 0;
@@ -61,8 +63,8 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 	case COMM_GET_VALUES:
 		send_buffer[ind++] = COMM_GET_VALUES;
 
-		buffer_append_float32(send_buffer, ADC_convertedResults[batteryVoltage], 1e3, &ind);  // FIXME: packVoltage
-		buffer_append_float32(send_buffer, ADC_convertedResults[chargeCurrent], 1e3, &ind);  // FIXME: packCurrent
+		buffer_append_int32(send_buffer, (int32_t) ADC_convertedResults[batteryVoltage], &ind);  // packVoltage
+		buffer_append_int32(send_buffer, (int32_t) ADC_convertedResults[chargeCurrent], &ind);  // packCurrent
 
 		send_buffer[ind++] = 50;  // FIXME: SoC
 
@@ -75,15 +77,14 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		buffer_append_float16(send_buffer, 0.0, 1e2, &ind);  // loCurrentLoadCurrent
 		buffer_append_float16(send_buffer, 0.0, 1e2, &ind);  // hiCurrentLoadVoltage
 		buffer_append_float16(send_buffer, 0.0, 1e2, &ind);  // hiCurrentLoadCurrent
-		buffer_append_float16(send_buffer, ADC_convertedResults[chargeCurrent], 1e2, &ind);  // FIXME: auxVoltage
-		buffer_append_float16(send_buffer, ADC_convertedResults[chargeCurrent], 1e2, &ind);  // FIXME: auxCurrent
+		buffer_append_float16(send_buffer, 0.0, 1e2, &ind);  // auxVoltage
+		buffer_append_float16(send_buffer, 0.0, 1e2, &ind);  // auxCurrent
 
 		// TODO: where does ADC_convertedResults[mcuInternalTemp] fit?
-		// TODO: convert temperatures to Celsius
-		buffer_append_float16(send_buffer, ADC_convertedResults[externalTemp], 1e1, &ind);  // FIXME: tempBatteryHigh
-		buffer_append_float16(send_buffer, ADC_convertedResults[externalTemp], 1e1, &ind);  // FIXME: tempBatteryAverage
-		buffer_append_float16(send_buffer, LTC6803_getTemperature(), 1e1, &ind);  // FIXME: tempBMSHigh
-		buffer_append_float16(send_buffer, LTC6803_getTemperature(), 1e1, &ind);  // FIXME: tempBMSAverage
+		buffer_append_int16(send_buffer, (int16_t) (ADC_convertedResults[externalTemp] * 1e1 - CELSIUS_TO_KELVIN_1E1), &ind);  // tempBatteryHigh
+		buffer_append_int16(send_buffer, (int16_t) (ADC_convertedResults[externalTemp] * 1e1 - CELSIUS_TO_KELVIN_1E1), &ind);  // tempBatteryAverage
+		buffer_append_int16(send_buffer, (int16_t) (LTC6803_getTemperature() * 1e1 - CELSIUS_TO_KELVIN_1E1), &ind);  // tempBMSHigh
+		buffer_append_int16(send_buffer, (int16_t) (LTC6803_getTemperature() * 1e1 - CELSIUS_TO_KELVIN_1E1), &ind);  // tempBMSAverage
 
 		// TODO: use runtimePars.chargingState and runtimePars.charging
 		send_buffer[ind++] = (uint8_t) OP_STATE_INIT;  // FIXME: operationalState
