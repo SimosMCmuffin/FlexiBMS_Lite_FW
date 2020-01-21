@@ -13,6 +13,7 @@
 
 static void(* volatile send_func)(unsigned char *data, unsigned int len) = 0;
 
+// TODO: use nonVolPars.chgParas.packCellCount instead
 uint8_t cell_count() {
 	for (uint8_t i = 0; i < MAX_CELLS; i++) {
 		if (LTC6803_getCellVoltage(i) == 0)
@@ -102,8 +103,8 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		uint8_t cells = cell_count();
 		send_buffer[ind++] = cells;
 		for (int i = 0; i < cells; i++) {
-			// TODO: multiply by -1 if balancing the cell
-			buffer_append_uint16(send_buffer, LTC6803_getCellVoltage(i), &ind);
+			int sign = LTC6803_getCellDischarge(i) ? -1 : 1;
+			buffer_append_int16(send_buffer, (int16_t) (LTC6803_getCellVoltage(i) * sign), &ind);
 		}
 
 		send_buffer[ind++] = CAN_ID;
