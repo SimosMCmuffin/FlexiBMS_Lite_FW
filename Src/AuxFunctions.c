@@ -12,6 +12,7 @@
 #include <ADC_LL.h>
 #include "main.h"
 #include <dStorage_MD.h>
+#include "config.h"
 
 extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 extern nonVolParameters nonVolPars;
@@ -175,22 +176,26 @@ uint8_t chargeControl(){
 	if( 	(chargingState != 0 && nonVolPars.chgParas.packCellCount != 0) ||
 			(nonVolPars.genParas.alwaysBalancing == 1 && nonVolPars.chgParas.packCellCount != 0) ){
 
+		uint8_t cellIndices[MAX_CELLS];
+		sortCellsByVoltage(cellIndices);
+
 		runtimePars.balancing = 0;
 		for(uint8_t x=0; x < nonVolPars.chgParas.packCellCount; x++){
-			if( 	(LTC6803_getCellVoltage(x) >= nonVolPars.chgParas.cellBalVolt) &&						//if cell voltage above balance voltage
-					(LTC6803_getCellVoltage(x) > (lowestCell(nonVolPars.chgParas.packCellCount) + nonVolPars.chgParas.cellDiffVolt)) ){	//and cell difference greater than allowed compared to the lowest cell
+			uint8_t i = cellIndices[x];
+			if( 	(LTC6803_getCellVoltage(i) >= nonVolPars.chgParas.cellBalVolt) &&						//if cell voltage above balance voltage
+					(LTC6803_getCellVoltage(i) > (lowestCell(nonVolPars.chgParas.packCellCount) + nonVolPars.chgParas.cellDiffVolt)) ){	//and cell difference greater than allowed compared to the lowest cell
 
 				if( runtimePars.balancing <= 5 ){	//allow max of 5 resistors to balance, to help reduce the thermal generation
-					LTC6803_setCellDischarge(x, 1);
+					LTC6803_setCellDischarge(i, 1);
 				}
 				else{
-					LTC6803_setCellDischarge(x, 0);
+					LTC6803_setCellDischarge(i, 0);
 				}
 
 				runtimePars.balancing++;
 			}
 			else
-				LTC6803_setCellDischarge(x, 0);
+				LTC6803_setCellDischarge(i, 0);
 		}
 
 		if( runtimePars.balancing > 0 ){
@@ -635,4 +640,24 @@ void changeRunMode(uint8_t runMode){
 
 	}
 
+}
+
+void sortCellsByVoltage(uint8_t indices[]) {  // return indices of the cells sorted by voltage, highest to lowest
+	// initialize
+	for (uint8_t i=0; i < nonVolPars.chgParas.packCellCount; i++)
+		indices[i] = i;
+
+	// bubble sort
+	uint8_t swapped = 1;
+	while (swapped) {
+		swapped = 0;
+		for (uint8_t i=0; i < nonVolPars.chgParas.packCellCount - 1; i++) {
+			if (LTC6803_getCellVoltage(indices[i]) < LTC6803_getCellVoltage(indices[i + 1])) {
+				uint8_t tmp = indices[i];
+				indices[i] = indices[i+1];
+				indices[i+1] = tmp;
+				swapped = 1;
+			}
+		}
+	}
 }

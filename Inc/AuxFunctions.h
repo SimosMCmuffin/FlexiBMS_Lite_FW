@@ -26,5 +26,7 @@ void checkCellVoltageFaults(void);
 void checkPackVoltageFault(void);
 void checkMaxCurrentFault(void);
 
+void sortCellsByVoltage(uint8_t indices[]);
+
 
 #endif /* AUXFUNCTIONS_H_ */
