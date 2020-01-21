@@ -185,7 +185,7 @@ uint8_t chargeControl(){
 			if( 	(LTC6803_getCellVoltage(i) >= nonVolPars.chgParas.cellBalVolt) &&						//if cell voltage above balance voltage
 					(LTC6803_getCellVoltage(i) > (lowestCell(nonVolPars.chgParas.packCellCount) + nonVolPars.chgParas.cellDiffVolt)) ){	//and cell difference greater than allowed compared to the lowest cell
 
-				if( runtimePars.balancing <= 5 ){	//allow max of 5 resistors to balance, to help reduce the thermal generation
+				if( runtimePars.balancing < 5 ){	//allow max of 5 resistors to balance, to help reduce the thermal generation
 					LTC6803_setCellDischarge(i, 1);
 				}
 				else{
