@@ -15,5 +15,7 @@ uint8_t CAN1_transmit(uint32_t, uint8_t *, uint8_t);
 uint8_t CAN1_rxAvailable(void);
 void CAN1_setupRxFilters(void);
 void CAN1_debugEcho(void);
+uint8_t CAN1_enableLoopBackMode(void);
+uint8_t CAN1_disableLoopBackMode(void);
 
 #endif /* CAN_LL_H_ */

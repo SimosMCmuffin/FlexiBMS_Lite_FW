@@ -180,6 +180,8 @@ uint8_t chargeControl(){
 			if( 	(LTC6803_getCellVoltage(x) >= nonVolPars.chgParas.cellBalVolt) &&						//if cell voltage above balance voltage
 					(LTC6803_getCellVoltage(x) > (lowestCell(nonVolPars.chgParas.packCellCount) + nonVolPars.chgParas.cellDiffVolt)) ){	//and cell difference greater than allowed compared to the lowest cell
 
+				runtimePars.balancing++;
+
 				if( runtimePars.balancing <= 5 ){	//allow max of 5 resistors to balance, to help reduce the thermal generation
 					LTC6803_setCellDischarge(x, 1);
 				}
@@ -187,7 +189,6 @@ uint8_t chargeControl(){
 					LTC6803_setCellDischarge(x, 0);
 				}
 
-				runtimePars.balancing++;
 			}
 			else
 				LTC6803_setCellDischarge(x, 0);
@@ -301,9 +302,10 @@ uint8_t chargeControl(){
 		break;
 
 	case 4:
-		if( chargeTick <= HAL_GetTick() )
+		if( chargeTick <= HAL_GetTick() ){
 			runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 			chargingState = 0;
+		}
 		break;
 
 	default:

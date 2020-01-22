@@ -26,7 +26,7 @@ extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 
 volatile uint8_t runMode = 0;
 
-const uint8_t FW_VERSION[] = {"FW_0002_WIP_DEBUG"};
+const uint8_t FW_VERSION[] = {"FW_0002"};
 
 nonVolParameters nonVolPars;
 runtimeParameters runtimePars;

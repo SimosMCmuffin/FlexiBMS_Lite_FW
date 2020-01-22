@@ -121,7 +121,13 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 	//check if mail available in either RX mailbox, if not return 0
 
 	if( (CAN1->RF0R & (3 << 0)) != 0 ){
-		*ID = CAN1->sFIFOMailBox[0].RIR;
+		if( !!(CAN1->sFIFOMailBox[0].RIR & (1 << 2)) == 1 ){	//check if standard or extended ID
+			*ID = CAN1->sFIFOMailBox[0].RIR >> 3;
+		}
+		else{
+			*ID = CAN1->sFIFOMailBox[0].RIR >> 21;
+		}
+
 		*length = CAN1->sFIFOMailBox[0].RDTR & (0xF << 0);	//read/extract data length
 
 		for(uint8_t x=0; x<4; x++){			//read/extract lower 4 bytes into buffer
@@ -136,7 +142,13 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 		return 1;
 	}
 	else if( (CAN1->RF1R & (3 << 0)) != 0 ){
-		*ID = CAN1->sFIFOMailBox[1].RIR;
+		if( !!(CAN1->sFIFOMailBox[1].RIR & (1 << 2)) == 1 ){	//check if standard or extended ID
+			*ID = CAN1->sFIFOMailBox[1].RIR >> 3;
+		}
+		else{
+			*ID = CAN1->sFIFOMailBox[1].RIR >> 21;
+		}
+
 		*length = CAN1->sFIFOMailBox[1].RDTR & (0xF << 0);	//read/extract data length
 
 		for(uint8_t x=0; x<4; x++){			//read/extract lower 4 bytes into buffer
@@ -153,5 +165,49 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 	else{
 		return 0;
 	}
+
+}
+
+uint8_t CAN1_enableLoopBackMode(void){
+
+	if( !!(CAN1->BTR & (1 << 30)) == 0 ){	//check if loop back mode is enabled yet
+
+		if( !!(CAN1->MSR & (1 << 0)) == 0 ){	//check if CAN1 is in initialization mode, if not put it in init mode
+			CAN1->MCR |= (1 << 0);				//request initialization
+			while( !(CAN1->MSR & (1 << 0)) );		//wait for initialization to be done
+		}
+
+		CAN1->BTR |= (1 << 30);		//enable loop back mode
+
+		CAN1->MCR &= ~(1 << 0);		//request to enter back to normal mode
+
+	}
+	else{
+		return 0;	//return 0 if loop back mode already enabled
+	}
+
+	return 1; 	//loop back mode enabled
+
+}
+
+uint8_t CAN1_disableLoopBackMode(void){
+
+	if( !!(CAN1->BTR & (1 << 30)) == 1 ){	//check if loop back mode is disabled yet
+
+		if( !!(CAN1->MSR & (1 << 0)) == 0 ){	//check if CAN1 is in initialization mode, if not put it in init mode
+			CAN1->MCR |= (1 << 0);				//request initialization
+			while( !(CAN1->MSR & (1 << 0)) );		//wait for initialization to be done
+		}
+
+		CAN1->BTR &= ~(1 << 30);		//disable loop back mode
+
+		CAN1->MCR &= ~(1 << 0);		//request to enter back to normal mode
+
+	}
+	else{
+		return 0;	//return 0 if loop back mode already disabled
+	}
+
+	return 1; 	//loop back mode disabled
 
 }
