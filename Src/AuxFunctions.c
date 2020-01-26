@@ -30,6 +30,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 
 		nonVols->genParas.stayActiveTime = 1000;
 		nonVols->genParas.alwaysBalancing = 0;
+		nonVols->genParas.always5vRequest = 0;
 
 		nonVols->chgParas.packCellCount = 12;
 		nonVols->chgParas.cellBalVolt = 4150;
@@ -68,6 +69,7 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 
 	runtimePars->buck5vEnabled = 0;
 	runtimePars->buck5vRequest = 0;
+	runtimePars->buck5vRequest |= (nonVolPars.genParas.always5vRequest << always5vRequest);
 	runtimePars->packVoltageEnabled = 0;
 	runtimePars->packVoltageRequest = 0;
 	runtimePars->chargerVoltageEnabled = 0;
@@ -183,6 +185,10 @@ uint8_t chargeControl(){
 				if( runtimePars.balancing <= 5 ){	//allow max of 5 resistors to balance, to help reduce the thermal generation
 					LTC6803_setCellDischarge(x, 1);
 				}
+				else{
+					LTC6803_setCellDischarge(x, 0);
+				}
+
 			}
 			else
 				LTC6803_setCellDischarge(x, 0);
@@ -296,9 +302,10 @@ uint8_t chargeControl(){
 		break;
 
 	case 4:
-		if( chargeTick <= HAL_GetTick() )
+		if( chargeTick <= HAL_GetTick() ){
 			runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 			chargingState = 0;
+		}
 		break;
 
 	default:
@@ -421,9 +428,37 @@ void statusLed(void){
 }
 
 void jumpToBootloader(void){
-	//de-init all peripherals
 
-	//check oscillator status
+	//Stop and de-init USB stack
+	USBD_DeInit(&hUsbDeviceFS);
+	__disable_irq();
+
+	//de-init all peripherals
+	SysTick->CTRL = 4;	//reset systick to default state (no interrupt enabled)
+
+	RCC->AHB2RSTR = ~(0x00000000);		//Reset all peripherals in AHB2 bus
+	RCC->AHB2ENR = 0;				//disable all peripheral clocks in AHB2 bus
+	RCC->AHB2RSTR = 0;			//Clear reset all peripherals in AHB2 bus
+
+	RCC->APB1RSTR1 = ~(0x00000400);		//Reset all peripherals in APB1 bus, except RTC peripheral
+	RCC->APB1ENR1 = 0x00000400;			//disable all peripheral clocks in APB1 bus
+	RCC->APB1RSTR1 = 0;			//Clear reset all peripherals in APB1 bus
+
+	RCC->APB2RSTR = ~(0x00000000);		//Reset all peripherals in APB2 bus
+	RCC->APB2ENR = 0;			//disable all peripheral clocks in APB2 bus
+	RCC->APB2RSTR = 0;			//Clear reset all peripherals in APB2 bus
+
+
+	//check oscillator status, MSI as main clock @ 4 MHz and everything else off
+	//check if USB's 48 MHz internal oscillator on
+	if( (RCC->CRRCR & (1 << 0)) != 0 ){	//HSI48_ON bit
+		RCC->CRRCR = 0;					//disable
+	}
+	if( ((RCC->CR & (0xF << 4)) >> 4) != 6 ){	//check if MSI_range something else than 6 (4 MHz speed)
+		RCC->CR = (RCC->CR & ~(0xF << 4)) | (6 << 4);	//set MSI_range to 6 (4 MHz speed)
+	}
+
+	for(uint32_t x=0; x<1400000; x++);
 
 	//jump to STM bootloader
 	asm("ldr r0, =0x1FFF0000"); //load R0 register with constant value 0x1FFF 0000, in this case the beginning of STM bootloader

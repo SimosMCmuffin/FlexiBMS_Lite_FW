@@ -12,9 +12,11 @@
 #include <LTC6803_3_DD.h>
 
 
-
 #define APP_RX_DATA_SIZE  64
 
+extern void jumpToBootloader(void);
+
+extern const uint8_t FW_VERSION[];
 extern nonVolParameters nonVolPars;
 extern runtimeParameters runtimePars;
 
@@ -47,6 +49,12 @@ void checkForNewMessages(){
 					break;
 				case 'F':
 					report_faults();
+					break;
+				case 'B':
+					jumpToBootloader();
+					break;
+				case 'W':
+					report_firmware();
 					break;
 				case 'S':
 					saveNonVolatileParameters(&nonVolPars);
@@ -207,6 +215,10 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case alwaysBalancing:
 		nonVolPars.genParas.alwaysBalancing = (uint16_t)*value;
 		break;
+	case keep5ValwaysOn:
+		nonVolPars.genParas.always5vRequest = (uint16_t)*value;
+		runtimePars.buck5vRequest = ((uint16_t)*value << always5vRequest);
+		break;
 	default:
 		report_error(error_invalidMessageID);
 		break;
@@ -239,6 +251,23 @@ void report_faults(void){
 	}
 
 	while( CDC_Transmit_FS(text, pos) );
+}
+
+void report_firmware(void){
+	uint8_t text[64] = {};
+	uint16_t pos = 0;
+
+	static const uint8_t Ftext1[] = {"FW version: "};
+	appendString(text, Ftext1, &pos);
+	appendString(text, FW_VERSION, &pos);
+
+	text[pos] = '\r';
+	pos++;
+	text[pos] = '\n';
+	pos++;
+
+	CDC_Transmit_FS(text, pos);
+
 }
 
 void report_state(void){
@@ -287,8 +316,6 @@ void report_state(void){
 	text[pos] = '\n';
 	pos++;
 
-	//Hexacopter's code got stuck here, seems like HW based problem, but change from halting execution
-	//while( CDC_Transmit_FS(text, pos) );
 	CDC_Transmit_FS(text, pos);
 }
 
@@ -299,6 +326,8 @@ void report_help(){
 							"$$ (view configurable parameters)\r\n"
 							"$R (turn BMS state report ON/OFF)\r\n"
 							"$F (view BMS faults)\r\n"
+							"$W (print FW version)\r\n"
+							"$B (jump into bootloader)\r\n"
 							"$S (save parameters to EEPROM)\r\n"
 							"$L (load parameters from EEPROM)\r\n"
 							"$D (load default parameters)\r\n\r\n"
@@ -553,6 +582,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendUint16(text, nonVolPars.genParas.alwaysBalancing, pos);
 		static const uint8_t description31[] = {" (0/1, allow cell balancing outside of charging, Boolean)\r\n"};
 		appendString(text, description31, pos);
+		break;
+	case keep5ValwaysOn:
+		appendUint16(text, nonVolPars.genParas.always5vRequest, pos);
+		static const uint8_t description32[] = {" (0/1, force 5V regulator always on when battery connected, Boolean)\r\n"};
+		appendString(text, description32, pos);
 		break;
 	default:
 		break;

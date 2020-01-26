@@ -46,6 +46,7 @@ typedef enum
 	AdcOversampling,
 
 	stayActiveTime,
+	keep5ValwaysOn,
 
 	numberOfElements
 }_parameter_ID;
@@ -70,6 +71,7 @@ void set_stayActiveTime(float*);
 
 void report_state(void);
 void report_faults(void);
+void report_firmware(void);
 void report_help(void);
 void report_error(_error_ID);
 void report_save(uint16_t);
