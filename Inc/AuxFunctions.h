@@ -26,5 +26,7 @@ void checkCellVoltageFaults(void);
 void checkPackVoltageFault(void);
 void checkMaxCurrentFault(void);
 
+uint8_t getHWversion(void);
+
 
 #endif /* AUXFUNCTIONS_H_ */

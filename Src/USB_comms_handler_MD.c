@@ -56,6 +56,12 @@ void checkForNewMessages(){
 				case 'W':
 					report_firmware();
 					break;
+				case 'H':
+					report_hardware();
+					break;
+				case 'C':
+					report_UID();
+					break;
 				case 'S':
 					saveNonVolatileParameters(&nonVolPars);
 					report_save(0);
@@ -270,6 +276,39 @@ void report_firmware(void){
 
 }
 
+void report_hardware(void){
+	uint8_t text[64] = {};
+	uint16_t pos = 0;
+
+	static const uint8_t Ftext1[] = {"FW version: "};
+	appendString(text, Ftext1, &pos);
+	appendString(text, FW_VERSION, &pos);
+
+	text[pos] = '\r';
+	pos++;
+	text[pos] = '\n';
+	pos++;
+
+	CDC_Transmit_FS(text, pos);
+}
+
+void report_UID(void){
+	uint8_t text[64] = {};
+	uint16_t pos = 0;
+
+	static const uint8_t Ftext1[] = {"Board UID: "};
+	appendString(text, Ftext1, &pos);
+	appendUID(text, &pos);
+
+	text[pos] = '\r';
+	pos++;
+	text[pos] = '\n';
+	pos++;
+
+	CDC_Transmit_FS(text, pos);
+
+}
+
 void report_state(void){
 	uint8_t text[128] = {};
 	uint16_t pos = 0;
@@ -327,6 +366,8 @@ void report_help(){
 							"$R (turn BMS state report ON/OFF)\r\n"
 							"$F (view BMS faults)\r\n"
 							"$W (print FW version)\r\n"
+							"$H (print HW version) (not implemented yet)\r\n"
+							"$C (print board Unique ID)\r\n"
 							"$B (jump into bootloader)\r\n"
 							"$S (save parameters to EEPROM)\r\n"
 							"$L (load parameters from EEPROM)\r\n"
@@ -759,6 +800,85 @@ void appendUint16(uint8_t* text, uint16_t number, uint16_t* pos){
 			*pos += 1;
 			index--;
 		}
+	}
+
+}
+
+void appendHex32(uint8_t* text, uint32_t number, uint16_t* pos){
+	uint8_t temp[10] = {'0', 'x', 0, 0, 0, 0, 0, 0, 0, 0};
+
+	for(uint8_t x=9; x>1; x--){
+		uint8_t nTemp = number % 16;
+		number = number >> 4;
+
+		if( nTemp >= 10 ){
+			temp[x] = 'A' + (nTemp - 10);
+		}
+		else{
+			temp[x] = '0' + nTemp;
+		}
+
+	}
+
+	for(uint8_t x=0; x<10; x++){
+		text[*pos] = temp[x];
+		*pos += 1;
+	}
+
+}
+
+void appendUID(uint8_t* text, uint16_t* pos){
+	uint8_t temp[26] = {'0', 'x', 	0, 0, 0, 0, 0, 0, 0, 0,
+									0, 0, 0, 0, 0, 0, 0, 0,
+									0, 0, 0, 0, 0, 0, 0, 0};
+
+	//extract the 96-bit unique hardware ID and append it as hexadecimals
+
+	uint32_t number = *(uint32_t*)(0x1FFF7590);
+
+	for(uint8_t x=9; x>1; x--){
+		uint8_t nTemp = number % 16;
+		number = number >> 4;
+
+		if( nTemp >= 10 ){
+			temp[x] = 'A' + (nTemp - 10);
+		}
+		else{
+			temp[x] = '0' + nTemp;
+		}
+	}
+
+	number = *(uint32_t*)(0x1FFF7590+4);
+
+	for(uint8_t x=17; x>9; x--){
+		uint8_t nTemp = number % 16;
+		number = number >> 4;
+
+		if( nTemp >= 10 ){
+			temp[x] = 'A' + (nTemp - 10);
+		}
+		else{
+			temp[x] = '0' + nTemp;
+		}
+	}
+
+	number = *(uint32_t*)(0x1FFF7590+8);
+
+	for(uint8_t x=25; x>17; x--){
+		uint8_t nTemp = number % 16;
+		number = number >> 4;
+
+		if( nTemp >= 10 ){
+			temp[x] = 'A' + (nTemp - 10);
+		}
+		else{
+			temp[x] = '0' + nTemp;
+		}
+	}
+
+	for(uint8_t x=0; x<26; x++){
+		text[*pos] = temp[x];
+		*pos += 1;
 	}
 
 }

@@ -72,6 +72,8 @@ void set_stayActiveTime(float*);
 void report_state(void);
 void report_faults(void);
 void report_firmware(void);
+void report_hardware(void);
+void report_UID(void);
 void report_help(void);
 void report_error(_error_ID);
 void report_save(uint16_t);
@@ -80,6 +82,8 @@ void report_parameters(_parameter_ID, uint8_t);
 
 float readFloat(uint8_t*, uint32_t*, uint8_t);
 void appendUint16(uint8_t*, uint16_t, uint16_t*);
+void appendHex32(uint8_t*, uint32_t, uint16_t*);
+void appendUID(uint8_t*, uint16_t*);
 void appendFloat(uint8_t*, float, uint16_t*);
 void appendString(uint8_t*, const uint8_t*, uint16_t*);
 void appendParameter(uint8_t*, uint16_t, uint16_t*);
