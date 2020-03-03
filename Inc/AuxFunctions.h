@@ -28,5 +28,7 @@ void checkMaxCurrentFault(void);
 
 uint8_t getHWversion(void);
 
+void sortCellsByVoltage(uint8_t*);
+
 
 #endif /* AUXFUNCTIONS_H_ */
