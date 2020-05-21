@@ -19,13 +19,13 @@ void CAN1_init(){
 	GPIOB->MODER |= (2 << 16) | (2 << 18);
 	GPIOB->AFR[1] |= (9 << 0) | (9 << 4);				//set alternative function to AF9(CAN1)
 
-	CAN1->MCR |= (1 << 4);				//no automatic retransmission
+	CAN1->MCR |= (1 << 4) | (1 << 2);				//no automatic retransmission, TX order by chronologically
 
 	CAN1->MCR |= (1 << 0);				//request initialization
 	while( !(CAN1->MSR & (1 << 0)) );		//wait for initialization to be done
 
 	CAN1->BTR = 0;
-	CAN1->BTR |= (1 << 24) | (1 << 20) | (4 << 16) | (3 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock
+	CAN1->BTR |= (3 << 24) | (1 << 20) | (4 << 16) | (3 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock
 	CAN1->MCR &= ~(1 << 0);				//request to enter normal mode
 
 	CAN1->MCR &= ~(1 << 1);				//exit sleep mode
@@ -42,7 +42,18 @@ uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 		uint8_t TX_empty = (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
 
 		CAN1->sTxMailBox[TX_empty].TIR = 0;
-		CAN1->sTxMailBox[TX_empty].TIR = (ID << 21);	//set CAN ID
+
+		if( ID <= 0x7FF ){		//decide whether to use standard or extended ID frame based on the argument ID's size
+			CAN1->sTxMailBox[TX_empty].TIR = (ID << 21);	//set CAN ID (standard, 11-bit)
+		}
+		else if( ID >= 0x800 && ID <= 0x1FFFFFFF){
+			CAN1->sTxMailBox[TX_empty].TIR = (ID << 3);	//set CAN ID (extended, 29-bit)
+			CAN1->sTxMailBox[TX_empty].TIR |= (1 << 2);	//use extended CAN ID
+		}
+		else{
+			return 0;	//return 0 if ID out of range
+		}
+
 		CAN1->sTxMailBox[TX_empty].TDTR = 0;
 		CAN1->sTxMailBox[TX_empty].TDTR = (length << 0);	//set data length
 

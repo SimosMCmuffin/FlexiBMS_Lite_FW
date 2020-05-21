@@ -59,6 +59,7 @@ int main(void)
 	uint64_t systemTick = HAL_GetTick(), LTC6803tick = HAL_GetTick();
 
 
+
 	while (1)
 	{
 
@@ -66,10 +67,12 @@ int main(void)
 			systemTick = HAL_GetTick();
 
 			usbPowerPresent();		//Init/deInit USB based on if 5V is detected from the USB connector
+			//CAN1_transmit(0x05050505, 0, 0);
 
 		}
 
-		CAN1_debugEcho();
+		//CAN1_debugEcho();
+
 
 		statusLed();		//Control status LED
 
@@ -166,6 +169,7 @@ static void GPIO_Init(void)
 	__DISABLE_CHG;
 
 	GPIOB->MODER = (GPIOB->MODER & ~(3 << 14));		//USB_DETECT
+	GPIOB->PUPDR |= (2 << 14);						//enable PB7/USB_DETECT pull-down resistor
 
 
 }
