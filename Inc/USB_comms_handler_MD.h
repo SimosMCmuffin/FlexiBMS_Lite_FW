@@ -84,6 +84,7 @@ float readFloat(uint8_t*, uint32_t*, uint8_t);
 void appendUint16(uint8_t*, uint16_t, uint16_t*);
 void appendHex32(uint8_t*, uint32_t, uint16_t*);
 void appendUID(uint8_t*, uint16_t*);
+void appendStringFromMemory(uint8_t*, uint8_t*, uint8_t, uint16_t*);
 void appendFloat(uint8_t*, float, uint16_t*);
 void appendString(uint8_t*, const uint8_t*, uint16_t*);
 void appendParameter(uint8_t*, uint16_t, uint16_t*);

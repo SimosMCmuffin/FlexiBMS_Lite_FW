@@ -48,6 +48,8 @@ extern "C" {
 #define __RED_LED_ON ( GPIOB->BSRR |= (1 << 29) )
 #define __RED_LED_OFF ( GPIOB->BSRR |= (1 << 13) )
 
+#define __TIME_HOUR_TICKS ( 86400000 )
+
 #include "stm32l4xx_hal.h"
 
 typedef enum
@@ -151,6 +153,8 @@ typedef struct _runtimeParameters {
 	uint16_t ADCrunState;
 	uint16_t LTC6803runState;
 	uint16_t usbConnected;
+	uint16_t optoActive;
+	uint16_t activeTimerState;
 	uint16_t chargingState;
 	uint16_t currentRunMode;
 	uint64_t faults;
@@ -165,6 +169,8 @@ typedef struct _runtimeParameters {
 	uint16_t charging;
 	uint16_t balancing;
 	uint16_t storageDischarging;
+
+	uint64_t activeTick;
 
 } runtimeParameters;
 

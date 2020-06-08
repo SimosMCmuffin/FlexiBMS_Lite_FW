@@ -10,7 +10,7 @@
 
 void SPI1_init(){
 
-	if( SPI_init == 0 ){		//check that SPI is not initialized
+	if( SPI_initialized == 0 ){		//check that SPI is not initialized
 		RCC->APB2ENR |= (1 << 12);	//enable SPI1 clock
 
 		SET_CS_PIN;
@@ -27,14 +27,14 @@ void SPI1_init(){
 
 		SPI1->CR1 |= (1 << 6);		//SPI1 enable
 
-		SPI_init = 1;		//mark SPI as initialized
+		SPI_initialized = 1;		//mark SPI as initialized
 	}
 
 }
 
 void SPI1_deInit(){
 
-	if( SPI_init == 1 ){		//check that SPI is initialized
+	if( SPI_initialized == 1 ){		//check that SPI is initialized
 		while( !!(GPIOA->IDR & (1 << 4)) == 0 );	//wait for CS pin to to go high, indicating transaction has ended
 		while( !!(SPI1->SR & (1 << 7)) == 1 );	//wait for SPI1 to be not busy
 		NVIC_DisableIRQ(SPI1_IRQn);				//disable SPI1 interrupt
@@ -46,7 +46,7 @@ void SPI1_deInit(){
 		GPIOA->MODER &= ~( (3 << 10) | (3 << 12) | (3 << 14) | (3 << 8) );	//configure pins PA4, PA5, PA6 & PA7 as analog pins
 		GPIOA->MODER |= (3 << 10) | (3 << 12) | (3 << 14) | (3 << 8);		//pins will float according to external pull-up/-down resistors
 
-		SPI_init = 0;		//mark SPI as non-initialized
+		SPI_initialized = 0;		//mark SPI as non-initialized
 	}
 
 }

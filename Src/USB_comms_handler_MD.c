@@ -279,10 +279,12 @@ void report_firmware(void){
 void report_hardware(void){
 	uint8_t text[64] = {};
 	uint16_t pos = 0;
+	uint8_t* memoryLocation = (uint8_t*)0x1FFF7000;
 
-	static const uint8_t Ftext1[] = {"FW version: "};
-	appendString(text, Ftext1, &pos);
-	appendString(text, FW_VERSION, &pos);
+	//static const uint8_t Ftext1[] = {"HW version: "};
+	//appendString(text, Ftext1, &pos);
+	//appendString(text, FW_VERSION, &pos);
+	appendStringFromMemory(text, memoryLocation, 0, &pos);
 
 	text[pos] = '\r';
 	pos++;
@@ -366,7 +368,7 @@ void report_help(){
 							"$R (turn BMS state report ON/OFF)\r\n"
 							"$F (view BMS faults)\r\n"
 							"$W (print FW version)\r\n"
-							"$H (print HW version) (not implemented yet)\r\n"
+							"$H (print HW version)\r\n"
 							"$C (print board Unique ID)\r\n"
 							"$B (jump into bootloader)\r\n"
 							"$S (save parameters to EEPROM)\r\n"
@@ -823,6 +825,17 @@ void appendHex32(uint8_t* text, uint32_t number, uint16_t* pos){
 	for(uint8_t x=0; x<10; x++){
 		text[*pos] = temp[x];
 		*pos += 1;
+	}
+
+}
+
+void appendStringFromMemory(uint8_t* text, uint8_t* location, uint8_t terminationChar, uint16_t* pos){
+	//read characters from specified location until specified termination character is met
+
+	while( *location != terminationChar && *location != 0xFF ){
+	text[*pos] = *location;
+	*pos += 1;
+	location += 1;
 	}
 
 }

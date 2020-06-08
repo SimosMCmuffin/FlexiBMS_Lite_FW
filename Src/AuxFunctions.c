@@ -63,11 +63,14 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 }
 
 void initRuntimeParameters(runtimeParameters* runtimePars){
-	runtimePars->ADCrunState = 0;
 	runtimePars->statePrintout = 0;
 	runtimePars->statusTick = 1000;
+	runtimePars->ADCrunState = 0;
+	runtimePars->LTC6803runState = 0;
 	runtimePars->usbConnected = 0;
+	runtimePars->optoActive = 0;
 	runtimePars->chargingState = 0;
+	runtimePars->currentRunMode = 1;
 	runtimePars->faults = 0;
 
 	runtimePars->buck5vEnabled = 0;
@@ -80,6 +83,9 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 
 	runtimePars->charging = 0;
 	runtimePars->balancing = 0;
+	runtimePars->storageDischarging = 0;
+
+	runtimePars->activeTick = HAL_GetTick();
 }
 
 uint8_t countCells(void){			//Count how many cells are above
@@ -119,13 +125,11 @@ uint8_t usbPowerPresent(void){		//Start and stop USB service depending on if 5V 
 	static uint8_t usb_state = 0;
 
 	if( !!(GPIOB->IDR & (1 << 7)) && usb_state == 0 ){	//if USB_Detect signal is high (USB 5V present), return 1
-		MX_USB_DEVICE_Init();
 		runtimePars.usbConnected = 1;
 		usb_state = 1;
 		runtimePars.buck5vRequest |= (1 << usb5vRequest);
 	}
 	else if( !(GPIOB->IDR & (1 << 7)) && usb_state == 1 ){
-		USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
 		runtimePars.usbConnected = 0;
 		usb_state = 0;
 		runtimePars.buck5vRequest &= ~(1 << usb5vRequest);
@@ -434,6 +438,20 @@ void statusLed(void){
 
 }
 
+void updateActiveTimer(void){
+
+	if( runtimePars.usbConnected == 1 || runtimePars.charging == 1 || runtimePars.balancing == 1 || runtimePars.optoActive == 1 ){
+		runtimePars.activeTick = HAL_GetTick();
+	}
+
+	if( runtimePars.activeTick + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS ) <= HAL_GetTick() ){
+		runtimePars.activeTimerState = 0;	//active time window passed
+	}
+	else{
+		runtimePars.activeTimerState = 1;	//active time window not-passed
+	}
+}
+
 void jumpToBootloader(void){
 
 	//Stop and de-init USB stack
@@ -589,59 +607,98 @@ void checkMaxCurrentFault(){
 
 }
 
-void changeRunMode(uint8_t runMode){
+void changeRunMode(){
 
-	switch(runMode){
+	switch( runtimePars.currentRunMode ){
 
 	case 0: 			//LOW-POWER STANDBY MODE
-		if( usbPowerPresent() ){		//opto_enable found || charger_detected)
+		if( runtimePars.optoActive == 1 || runtimePars.chargingState > 0 || runtimePars.usbConnected == 1 ){
+																				//(opto_enable found || charger_detected || usb_found)
 			PWR->CR1 &= ~(1 << 14);			//disable low-power run mode
 			while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle
-			while ( !(RCC->CR & RCC_CR_MSIRDY));
-			RCC->CR = (RCC->CR & ~(0xF << 4)) | (8 << 4);	//set MSI clock frequency to 16MHz
-			RCC->CR |= (1 << 3);					//activate new MSI clock frequency
+			changeMSIfreq(8);				//switch MSI to 16MHz
 
+			InitPeripherals();
 
-			__ENABLE_5V_BUCK;			//turn on 5V buck SMPS
-			//TODO ENABLE PERIPHERALS
-
-			runMode = 1;
+			runtimePars.currentRunMode = 1;
 		}
 		break;
 
 	case 1: 			//RUN MODE
-		if( usbPowerPresent() ){
-			PWR->CR1 = (PWR->CR1 & ~(3 << 9)) | (1 << 9);		//set voltage scaling to range 1 (high frequency)
-			while( !!(PWR->SR2 & (1 << 10)) );					//wait for voltage regulator to settle
-			FLASH->ACR = (FLASH->ACR & ~(7 << 0)) | (0 << 0);	//decrease flash memory wait states
-
+		if( runtimePars.usbConnected == 1 ){	//if USB 5V found, start 48MHz oscillator
 			RCC->CRRCR |= (1 << 0);			//enable HSI48 clock, used for USB
 			while( !(RCC->CRRCR & (1 << 1)) );	//wait for HSI48 to stabilize
-			RCC->APB1ENR1 |= (1 << 26);		//enable USB FS bus clock
-			USBD_Start(&hUsbDeviceFS);		//Start usb service
+			MX_USB_DEVICE_Init();
 
-			runMode = 2;
+			runtimePars.currentRunMode = 2;
 		}
-		else if( 0 ){	//opto_enable not found && charger not detected
-			while ( !(RCC->CR & RCC_CR_MSIRDY));
-			RCC->CR &= ~(0xF << 4);								//set MSI clock frequency to 100kHz
-			RCC->CR |= (1 << 3);								//activate new MSI clock frequency
+		else if( runtimePars.optoActive == 0 && runtimePars.chargingState == 0 && runtimePars.activeTimerState == 0 ){
+																				//opto_enable not found && charger not detected && stayActiveTimer expired
+			changeMSIfreq(0);					//switch MSI to 100kHz
+			PWR->CR1 |= (1 << 14);					//Go into low-power run mode
 
-			//PWR->CR1 |= (1 << 14);					//Go into low-power run mode
+			deInitPeripherals();
 
-			//TODO DISABLE PERIPHERALS
-			__DISABLE_5V_BUCK;			//turn off 5V buck SMPS
-
-			runMode = 0;
+			runtimePars.currentRunMode = 0;
 		}
 		break;
 
-	case 2:				//RUN MODE WITH USB
-		if(1){
+	case 2:				//RUN MODE W/ USB
+		if( runtimePars.usbConnected == 0 ){	//if USB 5V not found, then shutdown 48MHz oscillator and switch to run mode 1
+			USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
+			RCC->CRRCR |= (1 << 0);			//disable HSI48 clock, used for USB
 
+			runtimePars.currentRunMode = 1;
 		}
 		break;
 
+	}
+
+}
+
+void forceRunMode(uint8_t wantedMode){
+	static uint8_t currentMode = 1;	//default mode at beginning RUN MODE W/ USB
+
+	while(currentMode != wantedMode){
+		switch(currentMode){
+
+		case 0: 			//LOW-POWER STANDBY MODE
+			if( wantedMode > 0 ){		//opto_enable found || charger_detected || usb_found)
+				PWR->CR1 &= ~(1 << 14);			//disable low-power run mode
+				while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle
+				changeMSIfreq(8);
+
+				currentMode = 1;
+			}
+			break;
+
+		case 1: 			//RUN MODE
+			if( wantedMode > 1 ){	//if USB 5V found, start 48MHz oscillator
+				RCC->CRRCR |= (1 << 0);			//enable HSI48 clock, used for USB
+				while( !(RCC->CRRCR & (1 << 1)) );	//wait for HSI48 to stabilize
+				MX_USB_DEVICE_Init();
+
+				currentMode = 2;
+			}
+			else if( wantedMode < 1 ){	//opto_enable not found && charger not detected
+				changeMSIfreq(0);
+				PWR->CR1 |= (1 << 14);					//Go into low-power run mode
+
+				currentMode = 0;
+			}
+			break;
+
+		case 2:				//RUN MODE W/ USB
+			if( wantedMode < 1 ){	//if USB 5V not found, then shutdown 48MHz oscillator and switch to run mode 1
+				USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
+				RCC->CRRCR |= (1 << 0);			//disable HSI48 clock, used for USB
+
+				currentMode = 1;
+			}
+			break;
+
+		default: break;
+		}
 	}
 
 }
@@ -688,12 +745,14 @@ uint8_t extractUID(uint8_t pos){
 	return tempNumber;
 }
 
-uint8_t readOptoState(void){
+uint8_t updateOptoState(void){		//update the state of the opto-isolator
 	if( !!(GPIOA->IDR & (1 << 9)) == 0 ){	//if PA9 pin low -> opto-isolator active
+		runtimePars.optoActive = 1;
 		runtimePars.buck5vRequest |= (1 << opto5vRequest);
 		return 1;
 	}
 	else{
+		runtimePars.optoActive = 1;
 		runtimePars.buck5vRequest &= ~(1 << opto5vRequest);
 		return 0;
 	}
@@ -705,53 +764,6 @@ void changeMSIfreq(uint8_t freq){
 	RCC->CR |= (freq << 4);
 	RCC->CR |= (1 << 3);								//activate new MSI clock frequency
 	while ( !(RCC->CR & RCC_CR_MSIRDY));				//wait for MSI to be ready
-}
-
-void forceRunMode(uint8_t wantedMode){
-	static uint8_t currentMode = 1;	//default mode at beginning RUN MODE W/ USB
-
-	while(currentMode != wantedMode){
-		switch(currentMode){
-
-		case 0: 			//LOW-POWER STANDBY MODE
-			if( wantedMode > 0 ){		//opto_enable found || charger_detected)
-				PWR->CR1 &= ~(1 << 14);			//disable low-power run mode
-				while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle
-				changeMSIfreq(8);
-
-				currentMode = 1;
-			}
-			break;
-
-		case 1: 			//RUN MODE
-			if( wantedMode > 1 ){	//if USB 5V found, start 48MHz oscillator
-				RCC->CRRCR |= (1 << 0);			//enable HSI48 clock, used for USB
-				while( !(RCC->CRRCR & (1 << 1)) );	//wait for HSI48 to stabilize
-				MX_USB_DEVICE_Init();
-
-				currentMode = 2;
-			}
-			else if( wantedMode < 1 ){	//opto_enable not found && charger not detected
-				changeMSIfreq(0);
-				PWR->CR1 |= (1 << 14);					//Go into low-power run mode
-
-				currentMode = 0;
-			}
-			break;
-
-		case 2:				//RUN MODE W/ USB
-			if( wantedMode < 1 ){	//if USB 5V not found, then shutdown 48MHz oscillator and switch to run mode 1
-				USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
-				RCC->CRRCR |= (1 << 0);			//disable HSI48 clock, used for USB
-
-				currentMode = 1;
-			}
-			break;
-
-		default: break;
-		}
-	}
-
 }
 
 void InitPeripherals(void){

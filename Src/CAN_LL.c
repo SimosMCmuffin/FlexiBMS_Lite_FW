@@ -10,7 +10,7 @@
 
 void CAN1_init(){
 
-	if( CAN_init == 0){					//check that CAN is not initialized
+	if( CAN_initialized == 0){					//check that CAN is not initialized
 		RCC->APB1ENR1 |= (1 << 25);				//Enable CAN1 bus clock
 
 		GPIOA->MODER = (GPIOA->MODER & ~(3 << 20)) | (1 << 20);		//Configure pin PA10 as OUTPUT for CAN silent mode control
@@ -32,14 +32,14 @@ void CAN1_init(){
 		CAN1->MCR &= ~(1 << 1);				//exit sleep mode
 		while( !!(CAN1->MSR & (1 << 1)) == 1 );			//wait for CAN1 to exit sleep mode
 
-		CAN_init = 1;		//mark CAN as initialized
+		CAN_initialized = 1;		//mark CAN as initialized
 	}
 
 }
 
 void CAN1_deInit(){
 
-	if( CAN_init == 1){			//check that CAN is initialized
+	if( CAN_initialized == 1){			//check that CAN is initialized
 		CAN1->MCR |= (1 << 1);		//request to enter sleep mode
 		while( !!(CAN1->MSR & (1 << 1)) == 0 );		//wait for bus activity to finish/stop and enter sleep mode
 		RCC->APB1ENR1 &= ~(1 << 25);			//Disable CAN1 bus clock
@@ -47,14 +47,14 @@ void CAN1_deInit(){
 		GPIOB->MODER &= ~( (3 << 16) | (3 << 18) );			//Configure pins PB8 and PB9 to analog state for low-power usage
 		GPIOB->MODER |= (3 << 16) | (3 << 18);
 
-		CAN_init = 0;		//mark CAN as non-initialized
+		CAN_initialized = 0;		//mark CAN as non-initialized
 	}
 
 }
 
 uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 
-	if( !!(CAN1->TSR & (7 << 26)) && CAN_init == 1 ){		//Check that at least one TX mailbox is empty and that CAN is iniatilized
+	if( !!(CAN1->TSR & (7 << 26)) && CAN_initialized == 1 ){		//Check that at least one TX mailbox is empty and that CAN is iniatilized
 		uint8_t TX_empty = 0;// (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
 
 

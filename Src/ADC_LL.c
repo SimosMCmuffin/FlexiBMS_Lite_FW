@@ -14,7 +14,7 @@ extern runtimeParameters runtimePars;
 
 void ADC_init(void){
 
-	if( ADC_init == 0 ){		//check that ADC is not initialized
+	if( ADC_initialized == 0 ){		//check that ADC is not initialized
 		RCC->CCIPR |= (3 << 28);	//ADC input clock SYSCLK
 		RCC->AHB2ENR |= (1 << 13);	//enable ADC bus clock
 
@@ -48,13 +48,13 @@ void ADC_init(void){
 
 		ADC1->CR |= (1 << 0);			//enable ADC1
 
-		ADC_init = 1;		//mark ADC as initialized
+		ADC_initialized = 1;		//mark ADC as initialized
 	}
 }
 
 void ADC_deInit(void){
 
-	if( ADC_init == 1 ){		//check that ADC is initialized
+	if( ADC_initialized == 1 ){		//check that ADC is initialized
 		while( ADC_isStopped() == 0 );		//wait for ADC to be stopped
 		ADC1->CR |= (1 << 1);					//set ADDIS (adc disable) bit
 		NVIC_DisableIRQ(ADC1_IRQn);				//disable ADC1 interrupt
@@ -66,7 +66,7 @@ void ADC_deInit(void){
 		RCC->CCIPR &= ~(3 << 28);			//ADC input clock NONE
 
 		//No need to touch GPIO configurations as analog mode is the preferred mode for low-power
-		ADC_init = 0;		//mark ADC as non-initialized
+		ADC_initialized = 0;		//mark ADC as non-initialized
 	}
 
 }

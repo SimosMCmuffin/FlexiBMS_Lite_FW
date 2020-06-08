@@ -8,7 +8,7 @@
 #ifndef CAN_LL_H_
 #define CAN_LL_H_
 
-uint16_t CAN_init = 0;
+uint16_t CAN_initialized;
 
 void CAN1_init(void);
 void CAN1_deInit(void);

@@ -59,7 +59,9 @@ int main(void)
 			systemTick = HAL_GetTick();
 
 			usbPowerPresent();		//Init/deInit USB based on if 5V is detected from the USB connector
-			readOptoState();		//read state of the Opto-isolator
+			updateOptoState();		//read state of the Opto-isolator
+			updateActiveTimer();
+			changeRunMode();
 
 		}
 
@@ -91,10 +93,8 @@ void SystemClock_Config(void){
 
 	/**Initializes the CPU, AHB and APB busses clocks
 	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_MSI;
-	RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
 	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-	RCC_OscInitStruct.MSICalibrationValue = 0;
 	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_8;
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -125,12 +125,11 @@ void SystemClock_Config(void){
 
 	/**Configure the main internal regulator output voltage
 	 */
-	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE2) != HAL_OK)
 	{
 		Error_Handler();
 	}
 }
-
 /** Pinout Configuration
  */
 static void GPIO_Init(void)

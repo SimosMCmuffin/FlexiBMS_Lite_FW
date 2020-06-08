@@ -16,7 +16,7 @@ uint8_t usbPowerPresent(void);
 uint8_t chargeControl(void);
 void hwRequestControl(void);
 void statusLed(void);
-void changeRunMode(uint8_t);
+void changeRunMode();
 void jumpToBootloader(void);
 
 void checkChargerVoltageFault(void);
@@ -28,10 +28,12 @@ void checkMaxCurrentFault(void);
 
 uint8_t getHWversion(void);
 
+void updateActiveTimer(void);
+
 void sortCellsByVoltage(uint8_t*);
 
 uint8_t extractUID(uint8_t);
-uint8_t readOptoState(void);
+uint8_t updateOptoState(void);
 void changeMSIfreq(uint8_t);
 void forceRunMode(uint8_t);
 void InitPeripherals(void);

@@ -11,7 +11,7 @@
 #define SET_CS_PIN	(GPIOA->BSRR |= (1 << 4))
 #define CLR_CS_PIN	(GPIOA->BSRR |= (1 << 20))
 
-uint16_t SPI_init = 0;
+uint16_t SPI_initialized;
 
 void SPI1_init(void);
 void SPI1_deInit(void);

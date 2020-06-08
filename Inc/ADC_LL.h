@@ -26,7 +26,7 @@ typedef enum
 	mcuInternalTemp
 }_ADC_result;
 
-volatile uint16_t ADC_results[5], ADC_convertedResults[5], ADC_conversionIndex, ADC_init = 0;
+volatile uint16_t ADC_results[5], ADC_convertedResults[5], ADC_conversionIndex, ADC_initialized;
 volatile uint16_t TS_CAL1, TS_CAL2;
 float intTempStep, temp30Cvoltage;
 
