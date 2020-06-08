@@ -30,5 +30,12 @@ uint8_t getHWversion(void);
 
 void sortCellsByVoltage(uint8_t*);
 
+uint8_t extractUID(uint8_t);
+uint8_t readOptoState(void);
+void changeMSIfreq(uint8_t);
+void forceRunMode(uint8_t);
+void InitPeripherals(void);
+void deInitPeripherals(void);
+void trimOscillator(void);
 
 #endif /* AUXFUNCTIONS_H_ */

@@ -26,7 +26,7 @@ extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 
 volatile uint8_t runMode = 0;
 
-const uint8_t FW_VERSION[] = {"FW_0003_WIP"};
+const uint8_t FW_VERSION[] = {"FW_0.003_WIP"};
 
 nonVolParameters nonVolPars;
 runtimeParameters runtimePars;
@@ -42,19 +42,11 @@ int main(void)
 	SystemClock_Config();			//init oscillators
 
 	GPIO_Init();					//Init GPIO in-/outputs
-	MX_USB_DEVICE_Init();			//init ST's CDC (VCP) USB stack
-	SPI1_init();					//init SPI1 low level HW
-	LTC6803_init();					//init LTC6803 device driver
-	ADC_init();						//init ADC low level HW
-	CAN1_init();					//init CAN low level HW
-	CAN1_setupRxFilters();			//init CAN RX ID filters
+	InitPeripherals();				//function to init all peripherals
 
-	USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
+	HAL_Delay(500);
 
-	if( runtimePars.ADCrunState == 0 ){	//setup and start ADC sampling and conversion
-		ADC_setupSequence();
-		ADC_runSequence();
-	}
+	trimOscillator();
 
 	uint64_t systemTick = HAL_GetTick(), LTC6803tick = HAL_GetTick();
 
@@ -67,11 +59,9 @@ int main(void)
 			systemTick = HAL_GetTick();
 
 			usbPowerPresent();		//Init/deInit USB based on if 5V is detected from the USB connector
-			//CAN1_transmit(0x05050505, 0, 0);
+			readOptoState();		//read state of the Opto-isolator
 
 		}
-
-		//CAN1_debugEcho();
 
 
 		statusLed();		//Control status LED

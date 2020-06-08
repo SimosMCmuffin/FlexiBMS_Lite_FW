@@ -8,6 +8,8 @@
 #ifndef CAN_LL_H_
 #define CAN_LL_H_
 
+uint16_t CAN_init = 0;
+
 void CAN1_init(void);
 void CAN1_deInit(void);
 uint8_t CAN1_receive(uint32_t*, uint8_t *, uint8_t *);

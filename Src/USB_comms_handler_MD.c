@@ -836,43 +836,70 @@ void appendUID(uint8_t* text, uint16_t* pos){
 
 	uint32_t number = *(uint32_t*)(0x1FFF7590);
 
-	for(uint8_t x=9; x>1; x--){
-		uint8_t nTemp = number % 16;
+	for(uint8_t x=2; x<10; x+=2){
+		uint8_t nTemp2 = number % 16;
+		number = number >> 4;
+		uint8_t nTemp1 = number % 16;
 		number = number >> 4;
 
-		if( nTemp >= 10 ){
-			temp[x] = 'A' + (nTemp - 10);
+		if( nTemp1 >= 10 ){
+			temp[x] = 'A' + (nTemp1 - 10);
 		}
 		else{
-			temp[x] = '0' + nTemp;
+			temp[x] = '0' + nTemp1;
+		}
+
+		if( nTemp2 >= 10 ){
+			temp[x+1] = 'A' + (nTemp2 - 10);
+		}
+		else{
+			temp[x+1] = '0' + nTemp2;
 		}
 	}
 
 	number = *(uint32_t*)(0x1FFF7590+4);
 
-	for(uint8_t x=17; x>9; x--){
-		uint8_t nTemp = number % 16;
+	for(uint8_t x=10; x<18; x+=2){
+		uint8_t nTemp2 = number % 16;
+		number = number >> 4;
+		uint8_t nTemp1 = number % 16;
 		number = number >> 4;
 
-		if( nTemp >= 10 ){
-			temp[x] = 'A' + (nTemp - 10);
+		if( nTemp1 >= 10 ){
+			temp[x] = 'A' + (nTemp1 - 10);
 		}
 		else{
-			temp[x] = '0' + nTemp;
+			temp[x] = '0' + nTemp1;
+		}
+
+		if( nTemp2 >= 10 ){
+			temp[x+1] = 'A' + (nTemp2 - 10);
+		}
+		else{
+			temp[x+1] = '0' + nTemp2;
 		}
 	}
 
 	number = *(uint32_t*)(0x1FFF7590+8);
 
-	for(uint8_t x=25; x>17; x--){
-		uint8_t nTemp = number % 16;
+	for(uint8_t x=18; x<26; x+=2){
+		uint8_t nTemp2 = number % 16;
+		number = number >> 4;
+		uint8_t nTemp1 = number % 16;
 		number = number >> 4;
 
-		if( nTemp >= 10 ){
-			temp[x] = 'A' + (nTemp - 10);
+		if( nTemp1 >= 10 ){
+			temp[x] = 'A' + (nTemp1 - 10);
 		}
 		else{
-			temp[x] = '0' + nTemp;
+			temp[x] = '0' + nTemp1;
+		}
+
+		if( nTemp2 >= 10 ){
+			temp[x+1] = 'A' + (nTemp2 - 10);
+		}
+		else{
+			temp[x+1] = '0' + nTemp2;
 		}
 	}
 

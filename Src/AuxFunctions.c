@@ -13,6 +13,8 @@
 #include "main.h"
 #include <dStorage_MD.h>
 #include "config.h"
+#include <CAN_LL.h>
+#include <SPI_LL.h>
 
 extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 extern nonVolParameters nonVolPars;
@@ -663,4 +665,189 @@ void sortCellsByVoltage(uint8_t indices[]) {  // return indices of the cells sor
 			}
 		}
 	}
+}
+
+uint8_t extractUID(uint8_t pos){
+
+	uint32_t number = 0;
+	uint8_t tempNumber = 0;
+
+	if(pos <= 3 ){
+		number = *(uint32_t*)(0x1FFF7590);
+		tempNumber = number >> (8*pos);
+	}
+	else if( pos >= 4 && pos <= 7){
+		number = *(uint32_t*)(0x1FFF7590+4);
+		tempNumber = number >> (8*(pos-4));
+	}
+	else{
+		number = *(uint32_t*)(0x1FFF7590+8);
+		tempNumber = number >> (8*(pos-8));
+	}
+
+	return tempNumber;
+}
+
+uint8_t readOptoState(void){
+	if( !!(GPIOA->IDR & (1 << 9)) == 0 ){	//if PA9 pin low -> opto-isolator active
+		runtimePars.buck5vRequest |= (1 << opto5vRequest);
+		return 1;
+	}
+	else{
+		runtimePars.buck5vRequest &= ~(1 << opto5vRequest);
+		return 0;
+	}
+}
+
+void changeMSIfreq(uint8_t freq){
+	while ( !(RCC->CR & RCC_CR_MSIRDY));				//check that MSI ready before changing frequencies
+	RCC->CR &= ~(0xF << 4);								//set MSI clock frequency to 100kHz
+	RCC->CR |= (freq << 4);
+	RCC->CR |= (1 << 3);								//activate new MSI clock frequency
+	while ( !(RCC->CR & RCC_CR_MSIRDY));				//wait for MSI to be ready
+}
+
+void forceRunMode(uint8_t wantedMode){
+	static uint8_t currentMode = 1;	//default mode at beginning RUN MODE W/ USB
+
+	while(currentMode != wantedMode){
+		switch(currentMode){
+
+		case 0: 			//LOW-POWER STANDBY MODE
+			if( wantedMode > 0 ){		//opto_enable found || charger_detected)
+				PWR->CR1 &= ~(1 << 14);			//disable low-power run mode
+				while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle
+				changeMSIfreq(8);
+
+				currentMode = 1;
+			}
+			break;
+
+		case 1: 			//RUN MODE
+			if( wantedMode > 1 ){	//if USB 5V found, start 48MHz oscillator
+				RCC->CRRCR |= (1 << 0);			//enable HSI48 clock, used for USB
+				while( !(RCC->CRRCR & (1 << 1)) );	//wait for HSI48 to stabilize
+				MX_USB_DEVICE_Init();
+
+				currentMode = 2;
+			}
+			else if( wantedMode < 1 ){	//opto_enable not found && charger not detected
+				changeMSIfreq(0);
+				PWR->CR1 |= (1 << 14);					//Go into low-power run mode
+
+				currentMode = 0;
+			}
+			break;
+
+		case 2:				//RUN MODE W/ USB
+			if( wantedMode < 1 ){	//if USB 5V not found, then shutdown 48MHz oscillator and switch to run mode 1
+				USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
+				RCC->CRRCR |= (1 << 0);			//disable HSI48 clock, used for USB
+
+				currentMode = 1;
+			}
+			break;
+
+		default: break;
+		}
+	}
+
+}
+
+void InitPeripherals(void){
+	//USB init is taken care of when USB 5V is detected
+	SPI1_init();					//init SPI1 low level HW
+	LTC6803_init();					//init LTC6803 device driver
+	LTC6803_runEnable();
+	ADC_init();						//init ADC low level HW
+	ADC_start();
+	CAN1_init();					//init CAN low level HW
+	CAN1_setupRxFilters();			//init CAN RX ID filters
+
+	/*
+	if( USART_ENABLED)
+	//INIT USART
+	else if( I2C ENABLED
+	//INIT I2C
+	 */
+}
+
+void deInitPeripherals(void){
+	ADC_stop();
+	ADC_deInit();
+	LTC6803_runDisable();
+	SPI1_deInit();
+	CAN1_deInit();
+
+	/*
+		if( USART_ENABLED)
+		//DE-INIT USART
+		else if( I2C ENABLED
+		//DE-INIT I2C
+		 */
+}
+
+//trim MSI oscillator against HSI16
+void trimOscillator(void){
+	/*
+	//system clock output on PA8 pin
+	GPIOA->MODER &= ~(3 << 16);						//CHARGE_ENABLE
+	GPIOA->MODER |= (2 << 16);
+
+	RCC->CFGR |= (2 << 24);		//MCO on MSI
+	*/
+
+	uint8_t index = 0;
+
+	RCC->CR |= (1 << 8);		//enable HSI16
+	while( !!(RCC->CR & (1 << 10)) == 0 );	//wait for HSI16 to be ready
+
+	HAL_Delay(10);
+
+	RCC->CCIPR |= (2 << 20);	//set LPTIM2 clock source to HSI16
+
+	RCC->APB1ENR1 |= (1 << 31);		//enable LPTIM1 bus clock
+	RCC->APB1ENR2 |= (1 << 5);		//enable LPTIM2 bus clock
+
+	LPTIM1->CR |= (1 << 0);			//enable LPTIM1
+	LPTIM2->CR |= (1 << 0);			//enable LPTIM2
+
+	LPTIM1->ARR = 0xFFFF;		//set top of counters to max (16-bit)
+	LPTIM2->ARR = 0xFFFF;
+
+	while(1){
+
+	LPTIM1->CR |= (1 << 1);		//trigger LPTIM1 in single mode
+	LPTIM2->CR |= (1 << 1);		//trigger LPTIM2 in single mode
+
+	volatile uint16_t lptim1_CNT = 0, lptim2_CNT = 0;
+
+	while( lptim1_CNT < 0xB000 )		//wait for the counter values to go up
+		lptim1_CNT = LPTIM1->CNT;
+
+	lptim1_CNT = LPTIM1->CNT;			//read
+	lptim2_CNT = LPTIM2->CNT;
+	lptim1_CNT = LPTIM1->CNT;
+	lptim2_CNT = LPTIM2->CNT;
+
+
+	if( lptim1_CNT > lptim2_CNT ){	//counts close enough to eachother
+		break;
+	}
+	else{
+		index++;
+		RCC->ICSCR = (RCC->ICSCR & ~(0xFF << 8)) | (index << 8);
+	}
+	HAL_Delay(10);
+	}
+
+
+	LPTIM1->CR &= ~(1 << 0);		//disable LPTIM1
+	LPTIM2->CR &= ~(1 << 0);		//disable LPTIM2
+
+	RCC->APB1ENR1 &= ~(1 << 31);	//disable LPTIM1 bus clock
+	RCC->APB1ENR2 &= ~(1 << 5);		//disable LPTIM2 bus clock
+
+	RCC->CR &= ~(1 << 8);		//disable HSI16
+	RCC->CCIPR &= ~(3 << 20);	//set LPTIM2 clock source to default
 }

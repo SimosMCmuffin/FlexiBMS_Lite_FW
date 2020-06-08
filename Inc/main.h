@@ -94,7 +94,8 @@ typedef enum
 	ntc5vRequest,
 	led5vRequest,
 	balancing5vRequest,
-	always5vRequest
+	always5vRequest,
+	opto5vRequest
 }_5vRequest_ID;
 
 typedef struct _chargingParameters {
@@ -148,8 +149,10 @@ typedef struct _runtimeParameters {
 	uint16_t statePrintout;
 	uint16_t statusTick;
 	uint16_t ADCrunState;
+	uint16_t LTC6803runState;
 	uint16_t usbConnected;
 	uint16_t chargingState;
+	uint16_t currentRunMode;
 	uint64_t faults;
 
 	uint16_t buck5vEnabled;
@@ -161,7 +164,7 @@ typedef struct _runtimeParameters {
 
 	uint16_t charging;
 	uint16_t balancing;
-	uint16_t storageDischarge;
+	uint16_t storageDischarging;
 
 } runtimeParameters;
 
