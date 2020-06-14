@@ -20,7 +20,7 @@ extern const uint8_t FW_VERSION[];
 extern nonVolParameters nonVolPars;
 extern runtimeParameters runtimePars;
 
-void checkForNewMessages(){
+void USB_checkForNewMessages(){
 	static uint64_t liveTick = 0;
 	uint32_t length = 0;
 	uint8_t data[APP_RX_DATA_SIZE] = {0};
@@ -40,12 +40,7 @@ void checkForNewMessages(){
 					report_parameters(0, 1);
 					break;
 				case 'R':
-					if( runtimePars.statePrintout == 0 ){
-						runtimePars.statePrintout = 1;
-					}
-					else{
-						runtimePars.statePrintout = 0;
-					}
+					report_statePrint();
 					break;
 				case 'F':
 					report_faults();
@@ -257,6 +252,21 @@ void report_faults(void){
 	}
 
 	while( CDC_Transmit_FS(text, pos) );
+}
+
+void report_statePrint(void){
+	static const uint8_t Ftext1[] = {"\r\nStatus reporting ON:\r\n"};
+	static const uint8_t Ftext2[] = {"\r\nStatus reporting OFF:\r\n"};
+
+	if( runtimePars.statePrintout == 0 ){
+		runtimePars.statePrintout = 1;
+		CDC_Transmit_FS(Ftext1, sizeof(Ftext1)-1);
+	}
+	else{
+		runtimePars.statePrintout = 0;
+		CDC_Transmit_FS(Ftext2, sizeof(Ftext2)-1);
+	}
+
 }
 
 void report_firmware(void){
@@ -618,7 +628,7 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		break;
 	case stayActiveTime:
 		appendUint16(text, nonVolPars.genParas.stayActiveTime, pos);
-		static const uint8_t description25[] = {" (not used ATM; h (Hours), how long to stay in active mode, Uint)\r\n"};
+		static const uint8_t description25[] = {" (h (Hours), how long to stay in active mode, Uint)\r\n"};
 		appendString(text, description25, pos);
 		break;
 	case alwaysBalancing:
@@ -637,7 +647,7 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 
 }
 
-void appendFault(uint8_t* text, uint16_t indexNo, uint16_t* pos){
+void appendFault(uint8_t* text, uint16_t indexNo, uint16_t* pos){	//fault related strings
 
 	switch(indexNo){
 	case fault_lowPackVoltage:;
@@ -649,100 +659,148 @@ void appendFault(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendString(text, description1, pos);
 		break;
 	case fault_lowCellVoltage0:;
-		static const uint8_t description2[] = {"LOW_CELL1_VOLT:"};
+		static const uint8_t description2[] = {"CELL1_LOW_VOLT:"};
 		appendString(text, description2, pos);
 		break;
 	case fault_highCellVoltage0:;
-		static const uint8_t description3[] = {"HIGH_CELL1_VOLT:"};
+		static const uint8_t description3[] = {"CELL1_HIGH_VOLT:"};
 		appendString(text, description3, pos);
 		break;
 	case fault_lowCellVoltage1:;
-		static const uint8_t description4[] = {"LOW_CELL2_VOLT:"};
+		static const uint8_t description4[] = {"CELL2_LOW_VOLT:"};
 		appendString(text, description4, pos);
 		break;
 	case fault_highCellVoltage1:;
-		static const uint8_t description5[] = {"HIGH_CELL2_VOLT:"};
+		static const uint8_t description5[] = {"CELL2_HIGH_VOLT:"};
 		appendString(text, description5, pos);
 		break;
 	case fault_lowCellVoltage2:;
-		static const uint8_t description6[] = {"LOW_CELL3_VOLT:"};
+		static const uint8_t description6[] = {"CELL3_LOW_VOLT:"};
 		appendString(text, description6, pos);
 		break;
 	case fault_highCellVoltage2:;
-		static const uint8_t description7[] = {"HIGH_CELL3_VOLT:"};
+		static const uint8_t description7[] = {"CELL3_HIGH_VOLT:"};
 		appendString(text, description7, pos);
 		break;
 	case fault_lowCellVoltage3:;
-		static const uint8_t description8[] = {"LOW_CELL4_VOLT:"};
+		static const uint8_t description8[] = {"CELL4_LOW_VOLT:"};
 		appendString(text, description8, pos);
 		break;
 	case fault_highCellVoltage3:;
-		static const uint8_t description9[] = {"HIGH_CELL4_VOLT:"};
+		static const uint8_t description9[] = {"CELL4_HIGH_VOLT:"};
 		appendString(text, description9, pos);
 		break;
 	case fault_lowCellVoltage4:;
-		static const uint8_t description10[] = {"LOW_CELL5_VOLT:"};
+		static const uint8_t description10[] = {"CELL5_LOW_VOLT:"};
 		appendString(text, description10, pos);
 		break;
 	case fault_highCellVoltage4:;
-		static const uint8_t description11[] = {"HIGH_CELL5_VOLT:"};
+		static const uint8_t description11[] = {"CELL5_HIGH_VOLT:"};
 		appendString(text, description11, pos);
 		break;
 	case fault_lowCellVoltage5:;
-		static const uint8_t description12[] = {"LOW_CELL6_VOLT:"};
+		static const uint8_t description12[] = {"CELL6_LOW_VOLT:"};
 		appendString(text, description12, pos);
 		break;
 	case fault_highCellVoltage5:;
-		static const uint8_t description13[] = {"HIGH_CELL6_VOLT:"};
+		static const uint8_t description13[] = {"CELL6_HIGH_VOLT:"};
 		appendString(text, description13, pos);
 		break;
 	case fault_lowCellVoltage6:;
-		static const uint8_t description14[] = {"LOW_CELL7_VOLT:"};
+		static const uint8_t description14[] = {"CELL7_LOW_VOLT:"};
 		appendString(text, description14, pos);
 		break;
 	case fault_highCellVoltage6:;
-		static const uint8_t description15[] = {"HIGH_CELL7_VOLT:"};
+		static const uint8_t description15[] = {"CELL7_HIGH_VOLT:"};
 		appendString(text, description15, pos);
 		break;
 	case fault_lowCellVoltage7:;
-		static const uint8_t description16[] = {"LOW_CELL8_VOLT:"};
+		static const uint8_t description16[] = {"CELL8_LOW_VOLT:"};
 		appendString(text, description16, pos);
 		break;
 	case fault_highCellVoltage7:;
-		static const uint8_t description17[] = {"HIGH_CELL8_VOLT:"};
+		static const uint8_t description17[] = {"CELL8_HIGH_VOLT:"};
 		appendString(text, description17, pos);
 		break;
 	case fault_lowCellVoltage8:;
-		static const uint8_t description18[] = {"LOW_CELL9_VOLT:"};
+		static const uint8_t description18[] = {"CELL9_LOW_VOLT:"};
 		appendString(text, description18, pos);
 		break;
 	case fault_highCellVoltage8:;
-		static const uint8_t description19[] = {"HIGH_CELL9_VOLT:"};
+		static const uint8_t description19[] = {"CELL9_HIGH_VOLT:"};
 		appendString(text, description19, pos);
 		break;
 	case fault_lowCellVoltage9:;
-		static const uint8_t description20[] = {"LOW_CELL10_VOLT:"};
+		static const uint8_t description20[] = {"CELL10_LOW_VOLT:"};
 		appendString(text, description20, pos);
 		break;
 	case fault_highCellVoltage9:;
-		static const uint8_t description21[] = {"HIGH_CELL10_VOLT:"};
+		static const uint8_t description21[] = {"CELL10_HIGH_VOLT:"};
 		appendString(text, description21, pos);
 		break;
 	case fault_lowCellVoltage10:;
-		static const uint8_t description22[] = {"LOW_CELL11_VOLT:"};
+		static const uint8_t description22[] = {"CELL11_LOW_VOLT:"};
 		appendString(text, description22, pos);
 		break;
 	case fault_highCellVoltage10:;
-		static const uint8_t description23[] = {"HIGH_CELL11_VOLT:"};
+		static const uint8_t description23[] = {"CELL11_HIGH_VOLT:"};
 		appendString(text, description23, pos);
 		break;
 	case fault_lowCellVoltage11:;
-		static const uint8_t description24[] = {"LOW_CELL12_VOLT:"};
+		static const uint8_t description24[] = {"CELL12_LOW_VOLT:"};
 		appendString(text, description24, pos);
 		break;
 	case fault_highCellVoltage11:;
-		static const uint8_t description25[] = {"HIGH_CELL12_VOLT:"};
+		static const uint8_t description25[] = {"CELL12_HIGH_VOLT:"};
 		appendString(text, description25, pos);
+		break;
+	case fault_voltageErrorCell0:;
+		static const uint8_t description32[] = {"CELL1_VOLT_ERROR:"};
+		appendString(text, description32, pos);
+		break;
+	case fault_voltageErrorCell1:;
+		static const uint8_t description33[] = {"CELL2_VOLT_ERROR:"};
+		appendString(text, description33, pos);
+		break;
+	case fault_voltageErrorCell2:;
+		static const uint8_t description34[] = {"CELL3_VOLT_ERROR:"};
+		appendString(text, description34, pos);
+		break;
+	case fault_voltageErrorCell3:;
+		static const uint8_t description35[] = {"CELL4_VOLT_ERROR:"};
+		appendString(text, description35, pos);
+		break;
+	case fault_voltageErrorCell4:;
+		static const uint8_t description36[] = {"CELL5_VOLT_ERROR:"};
+		appendString(text, description36, pos);
+		break;
+	case fault_voltageErrorCell5:;
+		static const uint8_t description37[] = {"CELL6_VOLT_ERROR:"};
+		appendString(text, description37, pos);
+		break;
+	case fault_voltageErrorCell6:;
+		static const uint8_t description38[] = {"CELL7_VOLT_ERROR:"};
+		appendString(text, description38, pos);
+		break;
+	case fault_voltageErrorCell7:;
+		static const uint8_t description39[] = {"CELL8_VOLT_ERROR:"};
+		appendString(text, description39, pos);
+		break;
+	case fault_voltageErrorCell8:;
+		static const uint8_t description40[] = {"CELL9_VOLT_ERROR:"};
+		appendString(text, description40, pos);
+		break;
+	case fault_voltageErrorCell9:;
+		static const uint8_t description41[] = {"CELL10_VOLT_ERROR:"};
+		appendString(text, description41, pos);
+		break;
+	case fault_voltageErrorCell10:;
+		static const uint8_t description42[] = {"CELL11_VOLT_ERROR:"};
+		appendString(text, description42, pos);
+		break;
+	case fault_voltageErrorCell11:;
+		static const uint8_t description43[] = {"CELL12_VOLT_ERROR:"};
+		appendString(text, description43, pos);
 		break;
 	case fault_highChargerVoltage:;
 		static const uint8_t description26[] = {"HIGH_CHARGER_VOLT:"};
@@ -755,17 +813,17 @@ void appendFault(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 	case fault_lowBMStemp:;
 		static const uint8_t description28[] = {"LOW_BMS_TEMP:"};
 		appendString(text, description28, pos);
-		break;
-	case fault_highBMStemp:;
+	break;
+		case fault_highBMStemp:;
 		static const uint8_t description29[] = {"HIGH_BMS_TEMP:"};
 		appendString(text, description29, pos);
 		break;
 	case fault_lowNTCtemp:;
-		static const uint8_t description30[] = {"LOW_EXT_TEMP:"};
+		static const uint8_t description30[] = {"LOW_NTC_TEMP:"};
 		appendString(text, description30, pos);
 		break;
 	case fault_highNTCtemp:;
-		static const uint8_t description31[] = {"HIGH_EXT_TEMP:"};
+		static const uint8_t description31[] = {"HIGH_NTC_TEMP:"};
 		appendString(text, description31, pos);
 		break;
 	default:

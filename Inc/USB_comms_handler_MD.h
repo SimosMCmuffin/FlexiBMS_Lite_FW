@@ -58,7 +58,7 @@ typedef enum
 	error_invalidCommand
 }_error_ID;
 
-void checkForNewMessages(void);
+void USB_checkForNewMessages(void);
 
 void set_defaults(void);
 void set_parameter(float *, _parameter_ID);
@@ -70,6 +70,7 @@ void set_extNTCbetaValue(float*);
 void set_stayActiveTime(float*);
 
 void report_state(void);
+void report_statePrint(void);
 void report_faults(void);
 void report_firmware(void);
 void report_hardware(void);

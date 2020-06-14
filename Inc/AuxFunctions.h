@@ -13,18 +13,21 @@ uint8_t countCells(void);
 uint16_t highestCell(uint8_t);
 uint16_t lowestCell(uint8_t);
 uint8_t usbPowerPresent(void);
-uint8_t chargeControl(void);
+void chargeControl(void);
+void detectCharger(void);
+void balanceControl(void);
 void hwRequestControl(void);
 void statusLed(void);
 void changeRunMode();
 void jumpToBootloader(void);
 
+uint8_t checkFaults(void);
 void checkChargerVoltageFault(void);
 void checkBMStemperatureFault(void);
 void checkNTCtemperatureFault(void);
 void checkCellVoltageFaults(void);
 void checkPackVoltageFault(void);
-void checkMaxCurrentFault(void);
+uint8_t checkMaxCurrentFault(void);
 
 uint8_t getHWversion(void);
 

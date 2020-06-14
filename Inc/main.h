@@ -80,6 +80,18 @@ typedef enum
 	fault_highCellVoltage10,
 	fault_lowCellVoltage11,
 	fault_highCellVoltage11,
+	fault_voltageErrorCell0,
+	fault_voltageErrorCell1,
+	fault_voltageErrorCell2,
+	fault_voltageErrorCell3,
+	fault_voltageErrorCell4,
+	fault_voltageErrorCell5,
+	fault_voltageErrorCell6,
+	fault_voltageErrorCell7,
+	fault_voltageErrorCell8,
+	fault_voltageErrorCell9,
+	fault_voltageErrorCell10,
+	fault_voltageErrorCell11,
 	fault_highChargerVoltage,
 	fault_highChargingCurrent,
 	fault_lowBMStemp,
@@ -153,6 +165,7 @@ typedef struct _runtimeParameters {
 	uint16_t ADCrunState;
 	uint16_t LTC6803runState;
 	uint16_t usbConnected;
+	uint16_t chargerConnected;
 	uint16_t optoActive;
 	uint16_t activeTimerState;
 	uint16_t chargingState;
