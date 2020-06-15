@@ -31,7 +31,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->adcParas.extNTCbetaValue = 3380;
 		nonVols->adcParas.AdcOversampling = 16;
 
-		nonVols->genParas.stayActiveTime = 1000;
+		nonVols->genParas.stayActiveTime = 100;
 		nonVols->genParas.alwaysBalancing = 0;
 		nonVols->genParas.always5vRequest = 0;
 		nonVols->genParas.storageCellVoltage = 0;
@@ -58,7 +58,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->chgParas.maxNTCtemp = 0;
 		nonVols->chgParas.minNTCtemp = 0;
 
-		nonVols->chgParas.tickInterval = 5000;
+		nonVols->chgParas.tickInterval = 30;
 
 	}
 
@@ -214,7 +214,7 @@ void chargeControl(void){
 				break;
 			}
 		}
-		chargeTick = HAL_GetTick() + 150;
+		chargeTick = HAL_GetTick() + 300;
 		__ENABLE_CHG;
 		runtimePars.charging = 1;
 
