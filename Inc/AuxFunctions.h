@@ -21,7 +21,6 @@ void statusLed(void);
 void changeRunMode();
 void jumpToBootloader(void);
 
-uint8_t checkFaults(void);
 void checkChargerVoltageFault(void);
 void checkBMStemperatureFault(void);
 void checkNTCtemperatureFault(void);

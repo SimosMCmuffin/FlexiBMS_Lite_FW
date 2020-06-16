@@ -65,6 +65,7 @@ void USB_checkForNewMessages(){
 					report_load( loadNonVolatileParameters(&nonVolPars) );
 					break;
 				case 'D':
+					report_loadDefaults();
 					initNonVolatiles(&nonVolPars, 1);
 					break;
 				default:
@@ -171,8 +172,8 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case maxBMStemp:
 		nonVolPars.chgParas.maxBMStemp = (uint16_t)*value;
 		break;
-	case tickInterval:
-		nonVolPars.chgParas.tickInterval = (uint16_t)*value;
+	case refreshWaitTime:
+		nonVolPars.chgParas.refreshWaitTime = (uint16_t)*value;
 		break;
 	case ADC_chan_gain_0:
 		nonVolPars.adcParas.ADC_chan_gain[batteryVoltage] = *value;
@@ -242,14 +243,28 @@ void report_faults(void){
 	uint8_t text[256] = {};
 	uint16_t pos = 0;
 
-	static const uint8_t Ftext1[] = {"\r\nFaults:"};
+	static const uint8_t Ftext1[] = {"\r\nLatched faults:"};
+	static const uint8_t Ftext2[] = {"\r\nActive faults:"};
 	appendString(text, Ftext1, &pos);
 
 	for(uint8_t x=0; x<fault_numberOfElements; x++){
-		if( !!(runtimePars.faults & (1 << x)) ){
+		if( !!(runtimePars.latchedFaults & (1 << x)) ){
 			appendFault(text, x, &pos);
 		}
 	}
+
+	appendString(text, Ftext2, &pos);
+
+	for(uint8_t x=0; x<fault_numberOfElements; x++){
+		if( !!(runtimePars.activeFaults & (1 << x)) ){
+			appendFault(text, x, &pos);
+		}
+	}
+
+	text[pos] = '\r';
+	pos++;
+	text[pos] = '\n';
+	pos++;
 
 	while( CDC_Transmit_FS(text, pos) );
 }
@@ -267,6 +282,16 @@ void report_statePrint(void){
 		CDC_Transmit_FS(Ftext2, sizeof(Ftext2)-1);
 	}
 
+}
+
+void report_loadDefaults(void){
+	uint8_t text[64] = {};
+	uint16_t pos = 0;
+
+	static const uint8_t Ftext1[] = {"\r\nDefault values loaded!\r\n"};
+	appendString(text, Ftext1, &pos);
+
+	CDC_Transmit_FS(text, pos);
 }
 
 void report_firmware(void){
@@ -561,9 +586,9 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		static const uint8_t description13[] = {" (Maximum PCB temperature; K (Kelvin), the maximum temperature below which charging is allowed, Uint)\r\n"};
 		appendString(text, description13, pos);
 		break;
-	case tickInterval:
-		appendUint16(text, nonVolPars.chgParas.tickInterval, pos);
-		static const uint8_t description14[] = {" (Charging update interval; ms (milliseconds), How often check for connected charger or wait in case of error states before re-checking, Uint)\r\n"};
+	case refreshWaitTime:
+		appendUint16(text, nonVolPars.chgParas.refreshWaitTime, pos);
+		static const uint8_t description14[] = {" (Fault wait time; s (seconds), How long to wait after fault state before trying to start charging again, Uint)\r\n"};
 		appendString(text, description14, pos);
 		break;
 	case ADC_chan_gain_0:

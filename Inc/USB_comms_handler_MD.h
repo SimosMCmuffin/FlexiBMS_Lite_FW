@@ -30,7 +30,7 @@ typedef enum
 	minBMStemp,
 	maxBMStemp,
 	alwaysBalancing,
-	tickInterval,
+	refreshWaitTime,
 
 	ADC_chan_gain_0,
 	ADC_chan_offset_0,
@@ -72,6 +72,7 @@ void set_stayActiveTime(float*);
 void report_state(void);
 void report_statePrint(void);
 void report_faults(void);
+void report_loadDefaults(void);
 void report_firmware(void);
 void report_hardware(void);
 void report_UID(void);

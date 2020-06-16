@@ -134,7 +134,7 @@ typedef struct _chargingParameters {
 	uint16_t minBMStemp;		//K (Kelvin), PCB temperature, the minimum temperature above which charging is allowed
 	uint16_t maxBMStemp;		//K (Kelvin), PCB temperature, the maximum temperature below which charging is allowed
 
-	uint16_t tickInterval;		//s (seconds), wait time
+	uint16_t refreshWaitTime;	//s (seconds), wait time
 } chargingParameters;
 
 typedef struct _ADCparameters {
@@ -170,7 +170,8 @@ typedef struct _runtimeParameters {
 	uint16_t activeTimerState;
 	uint16_t chargingState;
 	uint16_t currentRunMode;
-	uint64_t faults;
+	uint64_t activeFaults;
+	uint64_t latchedFaults;
 
 	uint16_t buck5vEnabled;
 	uint16_t buck5vRequest;

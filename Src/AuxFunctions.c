@@ -58,7 +58,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->chgParas.maxNTCtemp = 0;
 		nonVols->chgParas.minNTCtemp = 0;
 
-		nonVols->chgParas.tickInterval = 30;
+		nonVols->chgParas.refreshWaitTime = 30;
 
 	}
 
@@ -74,7 +74,8 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 	runtimePars->optoActive = 0;
 	runtimePars->chargingState = 0;
 	runtimePars->currentRunMode = 1;
-	runtimePars->faults = 0;
+	runtimePars->activeFaults = 0;
+	runtimePars->latchedFaults = 0;
 
 	runtimePars->buck5vEnabled = 0;
 	runtimePars->buck5vRequest = 0;
@@ -154,7 +155,7 @@ void chargeControl(void){
 		runtimePars.buck5vRequest |= (1 << charging5vRequest);		//request 5V buck
 
 		if( runtimePars.chargingState == 0 ){
-			runtimePars.faults = 0;		//clear old latched faults
+			runtimePars.activeFaults = 0;		//clear active faults
 		}
 
 
@@ -169,7 +170,7 @@ void chargeControl(void){
 				runtimePars.packVoltageRequest |= (1 << 0);
 			}
 
-			if( runtimePars.faults == 0 && runtimePars.chargingState == 0){
+			if( runtimePars.activeFaults == 0 && runtimePars.chargingState == 0){
 				//allow charging to start
 				runtimePars.packVoltageRequest |= (1 << 0);
 				runtimePars.chargingState = 1;
@@ -184,8 +185,10 @@ void chargeControl(void){
 
 
 
-	if( runtimePars.chargingState != 0 && runtimePars.faults ){	//if faults found, set state machine to end-stop state
-		runtimePars.chargingState = 3;
+	if( runtimePars.chargingState != 0 && runtimePars.chargingState != 5 && runtimePars.activeFaults != 0 ){
+							//if faults found, set state machine to fault wait state
+		runtimePars.chargingState = 5;
+		chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
 	}
 
 	balanceControl();	//control/monitor cell balancing
@@ -271,10 +274,11 @@ void chargeControl(void){
 		break;
 
 	case 3:
-		//end or pause charging,
+		//end of charging,
 		__DISABLE_CHG;
 		runtimePars.charging = 0;
-		if( runtimePars.chargerConnected == 0 ){
+
+		if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
 			runtimePars.packVoltageRequest &= ~(1 << 0);
 			chargeTick = HAL_GetTick() + 250;
 			runtimePars.chargingState = 4;
@@ -284,6 +288,22 @@ void chargeControl(void){
 	case 4:
 		if( chargeTick <= HAL_GetTick() ){
 			runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
+			runtimePars.chargingState = 0;
+		}
+		break;
+
+	case 5:
+		//fault triggered charging stop,
+		__DISABLE_CHG;
+		runtimePars.charging = 0;
+
+		if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
+			runtimePars.packVoltageRequest &= ~(1 << 0);
+			chargeTick = HAL_GetTick() + 250;
+			runtimePars.chargingState = 4;
+		}
+		else if( chargeTick <= HAL_GetTick() ){
+			//wait for the refreshWaitTime to pass and try to start charging again
 			runtimePars.chargingState = 0;
 		}
 		break;
@@ -298,6 +318,9 @@ void chargeControl(void){
 void detectCharger(void){
 
 	if( ADC_convertedResults[chargerVoltage] > nonVolPars.chgParas.minChgVolt ){
+		if( runtimePars.chargerConnected == 0 ){	//clear latched faults if charger re-connected
+			runtimePars.latchedFaults = 0;
+		}
 		runtimePars.chargerConnected = 1;
 	}
 	else{
@@ -307,8 +330,8 @@ void detectCharger(void){
 
 void balanceControl(void){
 	//balancing
-	if( 	(runtimePars.chargingState != 0 && nonVolPars.chgParas.packCellCount != 0) ||
-			(nonVolPars.genParas.alwaysBalancing == 1 && nonVolPars.chgParas.packCellCount != 0) ){
+	if( 	nonVolPars.chgParas.packCellCount != 0 && runtimePars.activeFaults == 0 &&
+			(nonVolPars.genParas.alwaysBalancing == 1 || runtimePars.chargingState != 0) ){
 
 		uint8_t cellIndices[MAX_CELLS];
 		sortCellsByVoltage(cellIndices);
@@ -419,7 +442,7 @@ void statusLed(void){
 		if( statusLedTick < HAL_GetTick() ){
 			statusLedTick = HAL_GetTick() + 1000;
 
-			if( runtimePars.usbConnected == 1 && (runtimePars.faults || runtimePars.charging || runtimePars.balancing) ){
+			if( runtimePars.usbConnected == 1 && (runtimePars.activeFaults || runtimePars.charging || runtimePars.balancing) ){
 				if( state == 0 )
 					state = 1;
 				else
@@ -448,7 +471,7 @@ void statusLed(void){
 		}
 		else{
 			__BLUE_LED_OFF;
-			if( runtimePars.faults ){
+			if( runtimePars.activeFaults ){
 				__GREEN_LED_OFF;
 				__RED_LED_ON;
 			}
@@ -525,22 +548,12 @@ void jumpToBootloader(void){
 	asm("bx r0");				//jump there
 }
 
-uint8_t checkFaults(void){
-	uint64_t temp = runtimePars.faults;
-
-	if( temp != 0){
-		return 1;
-	}
-	else{
-		return 0;
-	}
-}
-
 void checkChargerVoltageFault(){
 
 	//if charger voltage over max
 	if( ADC_convertedResults[chargerVoltage] > nonVolPars.chgParas.maxChgVolt ){
-		runtimePars.faults |= ((uint64_t)1 << fault_highChargerVoltage);
+		runtimePars.activeFaults |= ((uint64_t)1 << fault_highChargerVoltage);
+		runtimePars.latchedFaults |= ((uint64_t)1 << fault_highChargerVoltage);
 	}
 	/*
 	else{
@@ -555,7 +568,8 @@ void checkBMStemperatureFault(){
 	//if BMS temperature low
 	if( 	ADC_convertedResults[mcuInternalTemp] < nonVolPars.chgParas.minBMStemp ||
 			LTC6803_getTemperature() < nonVolPars.chgParas.minBMStemp ){
-		runtimePars.faults |= ((uint64_t)1 << fault_lowBMStemp);
+		runtimePars.activeFaults |= ((uint64_t)1 << fault_lowBMStemp);
+		runtimePars.latchedFaults |= ((uint64_t)1 << fault_lowBMStemp);
 	}
 	/*
 	else{
@@ -566,7 +580,8 @@ void checkBMStemperatureFault(){
 	//if BMS temperature high
 	if( 	ADC_convertedResults[mcuInternalTemp] > nonVolPars.chgParas.maxBMStemp ||
 			LTC6803_getTemperature() > nonVolPars.chgParas.maxBMStemp ){
-		runtimePars.faults |= ((uint64_t)1 << fault_highBMStemp);
+		runtimePars.activeFaults |= ((uint64_t)1 << fault_highBMStemp);
+		runtimePars.latchedFaults |= ((uint64_t)1 << fault_highBMStemp);
 	}
 	/*
 	else{
@@ -580,7 +595,8 @@ void checkNTCtemperatureFault(){
 
 	//if NTC temperature low and enabled
 	if( ADC_convertedResults[externalTemp] < nonVolPars.chgParas.minPackVolt && nonVolPars.chgParas.minNTCtemp != 0 ){
-		runtimePars.faults |= ((uint64_t)1 << fault_lowNTCtemp);
+		runtimePars.activeFaults |= ((uint64_t)1 << fault_lowNTCtemp);
+		runtimePars.latchedFaults |= ((uint64_t)1 << fault_lowNTCtemp);
 	}
 	/*
 	else{
@@ -590,7 +606,8 @@ void checkNTCtemperatureFault(){
 
 	//if NTC temperature high and enabled
 	if( ADC_convertedResults[externalTemp] > nonVolPars.chgParas.maxPackVolt && nonVolPars.chgParas.maxNTCtemp != 0 ){
-		runtimePars.faults |= ((uint64_t)1 << fault_highNTCtemp);
+		runtimePars.activeFaults |= ((uint64_t)1 << fault_highNTCtemp);
+		runtimePars.latchedFaults |= ((uint64_t)1 << fault_highNTCtemp);
 	}
 	/*
 	else{
@@ -606,7 +623,8 @@ void checkCellVoltageFaults(){
 	if( nonVolPars.chgParas.packCellCount != 0 ){
 		for( uint8_t x=0; x<12; x++){
 			if( LTC6803_getCellVoltage(x) < nonVolPars.chgParas.minCellVolt && x < nonVolPars.chgParas.packCellCount ){	//if cell voltage below limit
-				runtimePars.faults |= ((uint64_t)1 << (fault_lowCellVoltage0 + (2*x)) );
+				runtimePars.activeFaults |= ((uint64_t)1 << (fault_lowCellVoltage0 + (2*x)) );
+				runtimePars.latchedFaults |= ((uint64_t)1 << (fault_lowCellVoltage0 + (2*x)) );
 			}
 			/*
 			else{
@@ -615,7 +633,8 @@ void checkCellVoltageFaults(){
 			*/
 
 			if( LTC6803_getCellVoltage(x) > nonVolPars.chgParas.maxCellVolt && x < nonVolPars.chgParas.packCellCount ){	//if cell voltage above limit
-				runtimePars.faults |= ((uint64_t)1 << (fault_highCellVoltage0 + (2*x)) );
+				runtimePars.activeFaults |= ((uint64_t)1 << (fault_highCellVoltage0 + (2*x)) );
+				runtimePars.latchedFaults |= ((uint64_t)1 << (fault_highCellVoltage0 + (2*x)) );
 			}
 			/*
 			else{
@@ -624,7 +643,8 @@ void checkCellVoltageFaults(){
 			*/
 
 			if( LTC6803_getCellVoltage(x) >= nonVolPars.chgParas.minCellVolt && x >= nonVolPars.chgParas.packCellCount){
-				runtimePars.faults |= ((uint64_t)1 << (fault_voltageErrorCell0 + x));
+				runtimePars.activeFaults |= ((uint64_t)1 << (fault_voltageErrorCell0 + x));
+				runtimePars.latchedFaults |= ((uint64_t)1 << (fault_voltageErrorCell0 + x));
 			}
 		}
 	}
@@ -644,7 +664,8 @@ void checkPackVoltageFault(){
 	//if pack voltage low
 	if( nonVolPars.chgParas.packCellCount == 0 ){
 		if( ADC_convertedResults[batteryVoltage] < nonVolPars.chgParas.minPackVolt ){
-			runtimePars.faults |= ((uint64_t)1 << fault_lowPackVoltage);
+			runtimePars.activeFaults |= ((uint64_t)1 << fault_lowPackVoltage);
+			runtimePars.latchedFaults |= ((uint64_t)1 << fault_lowPackVoltage);
 		}
 		/*
 	else{
@@ -654,7 +675,8 @@ void checkPackVoltageFault(){
 
 		//if pack voltage high
 		if( ADC_convertedResults[batteryVoltage] > nonVolPars.chgParas.maxPackVolt ){
-			runtimePars.faults |= ((uint64_t)1 << fault_highPackVoltage);
+			runtimePars.activeFaults |= ((uint64_t)1 << fault_highPackVoltage);
+			runtimePars.latchedFaults |= ((uint64_t)1 << fault_highPackVoltage);
 		}
 		/*
 	else{
@@ -669,7 +691,8 @@ uint8_t checkMaxCurrentFault(){
 
 	//if charging current over max
 	if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.maxChgCurr ){
-		runtimePars.faults |= ((uint64_t)1 << fault_highChargingCurrent);
+		runtimePars.activeFaults |= ((uint64_t)1 << fault_highChargingCurrent);
+		runtimePars.latchedFaults |= ((uint64_t)1 << fault_highChargingCurrent);
 		return 1;
 	}
 	else{
