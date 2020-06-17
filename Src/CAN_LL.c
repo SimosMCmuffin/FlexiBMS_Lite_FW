@@ -20,39 +20,76 @@ static unsigned int rx_buffer_last_id;
 
 void CAN1_init(){
 
-	RCC->APB1ENR1 |= (1 << 25);				//Enable CAN1 bus clock
+	if( CAN_initialized == 0){					//check that CAN is not initialized
+		RCC->APB1ENR1 |= (1 << 25);				//Enable CAN1 bus clock
 
-	GPIOA->MODER = (GPIOA->MODER & ~(3 << 20)) | (1 << 20);		//Configure pin PA10 as OUTPUT for CAN silent mode control
-	GPIOA->BSRR |= (1 << 26);									//don't Put CAN into silent mode (refer to TJA1051 datasheet for functional description)
+		GPIOA->MODER = (GPIOA->MODER & ~(3 << 20)) | (1 << 20);		//Configure pin PA10 as OUTPUT for CAN silent mode control
+		GPIOA->BSRR |= (1 << 26);									//don't Put CAN into silent mode (refer to TJA1051 datasheet for functional description)
 
-	GPIOB->MODER &= ~( (3 << 16) | (3 << 18) );			//Configure pins PB8 and PB9 alternative functions
-	GPIOB->MODER |= (2 << 16) | (2 << 18);
-	GPIOB->AFR[1] |= (9 << 0) | (9 << 4);				//set alternative function to AF9(CAN1)
+		GPIOB->MODER &= ~( (3 << 16) | (3 << 18) );			//Configure pins PB8 and PB9 alternative functions
+		GPIOB->MODER |= (2 << 16) | (2 << 18);
+		GPIOB->AFR[1] |= (9 << 0) | (9 << 4);				//set alternative function to AF9(CAN1)
 
-	CAN1->MCR |= (1 << 4);				//no automatic retransmission
+		CAN1->MCR |= (1 << 0);				//request initialization
+		while( !!(CAN1->MSR & (1 << 0)) == 0 );		//wait to enter initialization mode
 
-	CAN1->MCR |= (1 << 0);				//request initialization
-	while( !(CAN1->MSR & (1 << 0)) );		//wait for initialization to be done
+		CAN1->MCR |= (1 << 6) | (1 << 2);		//automatic bus-off management, *no automatic retransmission*, TX order by chronologically
 
-	CAN1->BTR = 0;
-	CAN1->BTR |= (1 << 24) | (1 << 20) | (4 << 16) | (3 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock
-	CAN1->MCR &= ~(1 << 0);				//request to enter normal mode
+		CAN1->BTR = 0;
+		CAN1->BTR |= (3 << 24) | (2 << 20) | (11 << 16) | (1 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock, 81%
+		CAN1->MCR &= ~(1 << 0);				//request to enter normal mode
 
-	CAN1->MCR &= ~(1 << 1);				//exit sleep mode
+		CAN1->MCR &= ~(1 << 1);				//exit sleep mode
+		while( !!(CAN1->MSR & (1 << 1)) == 1 );			//wait for CAN1 to exit sleep mode
+
+		CAN_initialized = 1;		//mark CAN as initialized
+	}
 
 }
 
 void CAN1_deInit(){
 
+	if( CAN_initialized == 1){			//check that CAN is initialized
+		CAN1->MCR |= (1 << 1);		//request to enter sleep mode
+		while( !!(CAN1->MSR & (1 << 1)) == 0 );		//wait for bus activity to finish/stop and enter sleep mode
+		RCC->APB1ENR1 &= ~(1 << 25);			//Disable CAN1 bus clock
+
+		GPIOB->MODER &= ~( (3 << 16) | (3 << 18) );			//Configure pins PB8 and PB9 to analog state for low-power usage
+		GPIOB->MODER |= (3 << 16) | (3 << 18);
+
+		CAN_initialized = 0;		//mark CAN as non-initialized
+	}
+
 }
 
 uint8_t CAN1_attempt_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 
-	if( !!(CAN1->TSR & (7 << 26)) ){		//Check that at least one TX mailbox is empty
-		uint8_t TX_empty = (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
+	if( !!(CAN1->TSR & (7 << 26)) && CAN_initialized == 1 ){		//Check that at least one TX mailbox is empty and that CAN is iniatilized
+		uint8_t TX_empty = 0;// (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
+
+
+		if( !!(CAN1->TSR & (1 << 26)) == 1 )
+			TX_empty = 0;
+		else if( !!(CAN1->TSR & (1 << 27)) == 1 )
+			TX_empty = 1;
+		else
+			TX_empty = 2;
+
 
 		CAN1->sTxMailBox[TX_empty].TIR = 0;
-		CAN1->sTxMailBox[TX_empty].TIR = (ID << 3) | (1 << 2);	//set CAN ID
+
+
+		if( ID <= 0x7FF ){		//decide whether to use standard or extended ID frame based on the argument ID's size
+			CAN1->sTxMailBox[TX_empty].TIR = (ID << 21);	//set CAN ID (standard, 11-bit)
+		}
+		else if( ID >= 0x800 && ID <= 0x1FFFFFFF){
+			CAN1->sTxMailBox[TX_empty].TIR = (ID << 3);	//set CAN ID (extended, 29-bit)
+			CAN1->sTxMailBox[TX_empty].TIR |= (1 << 2);	//use extended CAN ID
+		}
+		else{
+			return 0;	//return 0 if ID out of range
+		}
+
 		CAN1->sTxMailBox[TX_empty].TDTR = 0;
 		CAN1->sTxMailBox[TX_empty].TDTR = (length << 0);	//set data length
 
@@ -123,10 +160,12 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 	//check if mail available in either RX mailbox, if not return 0
 
 	if( (CAN1->RF0R & (3 << 0)) != 0 ){
-		if (CAN1->sFIFOMailBox[0].RIR & (1 << 2))
-			*ID = CAN1->sFIFOMailBox[0].RIR >> 3;  // extended ID
-		else
-			*ID = CAN1->sFIFOMailBox[0].RIR >> 21;  // standard ID
+		if( !!(CAN1->sFIFOMailBox[0].RIR & (1 << 2)) == 1 ){	//check if standard or extended ID
+			*ID = CAN1->sFIFOMailBox[0].RIR >> 3;
+		}
+		else{
+			*ID = CAN1->sFIFOMailBox[0].RIR >> 21;
+		}
 
 		*length = CAN1->sFIFOMailBox[0].RDTR & (0xF << 0);	//read/extract data length
 
@@ -142,10 +181,12 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 		return 1;
 	}
 	else if( (CAN1->RF1R & (3 << 0)) != 0 ){
-		if (CAN1->sFIFOMailBox[1].RIR & (1 << 2))
-			*ID = CAN1->sFIFOMailBox[1].RIR >> 3;  // extended ID
-		else
-			*ID = CAN1->sFIFOMailBox[1].RIR >> 21;  // standard ID
+		if( !!(CAN1->sFIFOMailBox[1].RIR & (1 << 2)) == 1 ){	//check if standard or extended ID
+			*ID = CAN1->sFIFOMailBox[1].RIR >> 3;
+		}
+		else{
+			*ID = CAN1->sFIFOMailBox[1].RIR >> 21;
+		}
 
 		*length = CAN1->sFIFOMailBox[1].RDTR & (0xF << 0);	//read/extract data length
 
@@ -165,6 +206,7 @@ uint8_t CAN1_receive(uint32_t * ID, uint8_t * data, uint8_t * length){
 	}
 
 }
+
 
 void comm_can_send_buffer(uint8_t controller_id, uint8_t *data, unsigned int len, uint8_t send) {
 	uint8_t send_buffer[8];
@@ -260,4 +302,47 @@ void CAN1_process_message() {
 	}
 
 	// Nothing to do for commands_send==1 (forward) and commands_send==2 (process without responding) for now.
+
+uint8_t CAN1_enableLoopBackMode(void){
+
+	if( !!(CAN1->BTR & (1 << 30)) == 0 ){	//check if loop back mode is enabled yet
+
+		if( !!(CAN1->MSR & (1 << 0)) == 0 ){	//check if CAN1 is in initialization mode, if not put it in init mode
+			CAN1->MCR |= (1 << 0);				//request initialization
+			while( !(CAN1->MSR & (1 << 0)) );		//wait for initialization to be done
+		}
+
+		CAN1->BTR |= (1 << 30);		//enable loop back mode
+
+		CAN1->MCR &= ~(1 << 0);		//request to enter back to normal mode
+
+	}
+	else{
+		return 0;	//return 0 if loop back mode already enabled
+	}
+
+	return 1; 	//loop back mode enabled
+
+}
+
+uint8_t CAN1_disableLoopBackMode(void){
+
+	if( !!(CAN1->BTR & (1 << 30)) == 1 ){	//check if loop back mode is disabled yet
+
+		if( !!(CAN1->MSR & (1 << 0)) == 0 ){	//check if CAN1 is in initialization mode, if not put it in init mode
+			CAN1->MCR |= (1 << 0);				//request initialization
+			while( !(CAN1->MSR & (1 << 0)) );		//wait for initialization to be done
+		}
+
+		CAN1->BTR &= ~(1 << 30);		//disable loop back mode
+
+		CAN1->MCR &= ~(1 << 0);		//request to enter back to normal mode
+
+	}
+	else{
+		return 0;	//return 0 if loop back mode already disabled
+	}
+
+	return 1; 	//loop back mode disabled
+
 }

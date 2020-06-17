@@ -48,6 +48,8 @@ extern "C" {
 #define __RED_LED_ON ( GPIOB->BSRR |= (1 << 29) )
 #define __RED_LED_OFF ( GPIOB->BSRR |= (1 << 13) )
 
+#define __TIME_HOUR_TICKS ( 86400000 )
+
 #include "stm32l4xx_hal.h"
 
 typedef enum
@@ -78,6 +80,18 @@ typedef enum
 	fault_highCellVoltage10,
 	fault_lowCellVoltage11,
 	fault_highCellVoltage11,
+	fault_voltageErrorCell0,
+	fault_voltageErrorCell1,
+	fault_voltageErrorCell2,
+	fault_voltageErrorCell3,
+	fault_voltageErrorCell4,
+	fault_voltageErrorCell5,
+	fault_voltageErrorCell6,
+	fault_voltageErrorCell7,
+	fault_voltageErrorCell8,
+	fault_voltageErrorCell9,
+	fault_voltageErrorCell10,
+	fault_voltageErrorCell11,
 	fault_highChargerVoltage,
 	fault_highChargingCurrent,
 	fault_lowBMStemp,
@@ -94,7 +108,8 @@ typedef enum
 	ntc5vRequest,
 	led5vRequest,
 	balancing5vRequest,
-	always5vRequest
+	always5vRequest,
+	opto5vRequest
 }_5vRequest_ID;
 
 typedef struct _chargingParameters {
@@ -119,7 +134,7 @@ typedef struct _chargingParameters {
 	uint16_t minBMStemp;		//K (Kelvin), PCB temperature, the minimum temperature above which charging is allowed
 	uint16_t maxBMStemp;		//K (Kelvin), PCB temperature, the maximum temperature below which charging is allowed
 
-	uint16_t tickInterval;		//s (seconds), wait time
+	uint16_t refreshWaitTime;	//s (seconds), wait time
 } chargingParameters;
 
 typedef struct _ADCparameters {
@@ -133,6 +148,9 @@ typedef struct _generalParameters {
 	uint16_t stayActiveTime;	//h (Hours), how long to stay in active mode
 	uint16_t alwaysBalancing;	//1 or 0, allow balancing even when not charging
 	uint16_t always5vRequest;	//1 or 0, force 5V buck always on
+
+	uint16_t storageCellVoltage;	//mV (milliVolts), what voltage to discharge cells if storage voltage discharge enabled
+	uint16_t timeToStorageDischarge;	//h (hours), how long to wait after active state to start discharging cells to storage voltage
 } generalParameters;
 
 typedef struct _nonVolParameters {
@@ -145,9 +163,15 @@ typedef struct _runtimeParameters {
 	uint16_t statePrintout;
 	uint16_t statusTick;
 	uint16_t ADCrunState;
+	uint16_t LTC6803runState;
 	uint16_t usbConnected;
+	uint16_t chargerConnected;
+	uint16_t optoActive;
+	uint16_t activeTimerState;
 	uint16_t chargingState;
-	uint64_t faults;
+	uint16_t currentRunMode;
+	uint64_t activeFaults;
+	uint64_t latchedFaults;
 
 	uint16_t buck5vEnabled;
 	uint16_t buck5vRequest;
@@ -158,6 +182,9 @@ typedef struct _runtimeParameters {
 
 	uint16_t charging;
 	uint16_t balancing;
+	uint16_t storageDischarging;
+
+	uint64_t activeTick;
 
 } runtimeParameters;
 

@@ -26,7 +26,10 @@ extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 
 volatile uint8_t runMode = 0;
 
-const uint8_t FW_VERSION[] = {"FW_0002_WIP_DEBUG"};
+const uint8_t FW_VERSION[] = {"FW_0.003_RC"};
+//const uint8_t FW_MAJOR = 0;
+//const uint8_t FW_MINOR = 4;
+
 
 nonVolParameters nonVolPars;
 runtimeParameters runtimePars;
@@ -42,30 +45,29 @@ int main(void)
 	SystemClock_Config();			//init oscillators
 
 	GPIO_Init();					//Init GPIO in-/outputs
-	MX_USB_DEVICE_Init();			//init ST's CDC (VCP) USB stack
-	SPI1_init();					//init SPI1 low level HW
-	LTC6803_init();					//init LTC6803 device driver
-	ADC_init();						//init ADC low level HW
-	CAN1_init();					//init CAN low level HW
-	CAN1_setupRxFilters();			//init CAN RX ID filters
+	InitPeripherals();				//function to init all peripherals
 
-	USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
+	runtimePars.chargerVoltageRequest |= (1 << 0);	//start with charger and pack voltage measuring enabled
+	runtimePars.packVoltageRequest |= (1 << 0);
 
-	if( runtimePars.ADCrunState == 0 ){	//setup and start ADC sampling and conversion
-		ADC_setupSequence();
-		ADC_runSequence();
-	}
+	HAL_Delay(500);
+
+	trimOscillator();
 
 	uint64_t systemTick = HAL_GetTick(), LTC6803tick = HAL_GetTick();
+	runtimePars.activeTick =  HAL_GetTick() + 5000;
 
 
 	while (1)
 	{
 
-		if( systemTick + 20 <= HAL_GetTick() ){		//go in here at max every 20ms
+		if( systemTick + 25 <= HAL_GetTick() ){		//go in here at max every 20ms
 			systemTick = HAL_GetTick();
 
-			usbPowerPresent();		//Init/deInit USB based on if 5V is detected from the USB connector
+			usbPowerPresent();		//check if 5V is detected from the USB connector
+			updateOptoState();		//read state of the Opto-isolator
+			updateActiveTimer();	//update activeTimer flags
+			changeRunMode();		//change running modes based on some flags
 
 		}
 
@@ -75,14 +77,49 @@ int main(void)
 
 		hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
 
+		detectCharger();
 		chargeControl();	//charging algorithm, everything charging control related is done through here
 
-		checkForNewMessages();		//check for new messages from USB and send State printout if enabled
+		USB_checkForNewMessages();		//check for new messages from USB and send State printout if enabled
 
 		if( LTC6803tick <= HAL_GetTick() ){		//all LTC6803 SPI communications are started from this tick function
 			LTC6803tick = HAL_GetTick() + 5;
 			LTC6803_transactionHandler(&LTC6803tick);
 		}
+
+
+		if( runtimePars.currentRunMode == 0 ){	//special loop for low-power running
+			uint8_t cycles = 0;
+
+			while( runtimePars.currentRunMode == 0 ){
+				//most of time do nothing, but check opto and USB
+				//occasionally enable ADC for couple conversion cycles to update analog readings
+				cycles++;
+
+				if( cycles == 20 ){
+					cycles = 0;
+					runtimePars.chargerVoltageRequest |= (1 << 0);
+					runtimePars.packVoltageRequest |= (1 << 0);
+					hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
+					ADC_init();						//init ADC low level HW
+					ADC_start();
+					HAL_Delay(3);
+					ADC_stop();
+					ADC_deInit();
+					runtimePars.chargerVoltageRequest &= ~(1 << 0);
+					runtimePars.packVoltageRequest &= ~(1 << 0);
+					hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
+				}
+
+				usbPowerPresent();		//check if 5V is detected from the USB connector
+				updateOptoState();		//read state of the Opto-isolator
+				updateActiveTimer();	//update activeTimer flags
+				detectCharger();
+				changeRunMode();		//change running modes based on some flags
+				HAL_Delay(1);
+			}
+		}
+
 
 	}
 }
@@ -98,10 +135,8 @@ void SystemClock_Config(void){
 
 	/**Initializes the CPU, AHB and APB busses clocks
 	 */
-	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI48|RCC_OSCILLATORTYPE_MSI;
-	RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
+	RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_MSI;
 	RCC_OscInitStruct.MSIState = RCC_MSI_ON;
-	RCC_OscInitStruct.MSICalibrationValue = 0;
 	RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_8;
 	RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
 	if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -132,12 +167,11 @@ void SystemClock_Config(void){
 
 	/**Configure the main internal regulator output voltage
 	 */
-	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1) != HAL_OK)
+	if (HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE2) != HAL_OK)
 	{
 		Error_Handler();
 	}
 }
-
 /** Pinout Configuration
  */
 static void GPIO_Init(void)
@@ -166,7 +200,9 @@ static void GPIO_Init(void)
 	__DISABLE_CHG;
 
 	GPIOB->MODER = (GPIOB->MODER & ~(3 << 14));		//USB_DETECT
+	GPIOB->PUPDR |= (2 << 14);						//enable PB7/USB_DETECT pull-down resistor
 
+	GPIOA->MODER &= ~(3 << 18);					//OPTO_enable to input mode
 
 }
 void Error_Handler(void)

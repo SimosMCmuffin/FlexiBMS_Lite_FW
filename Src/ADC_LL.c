@@ -10,52 +10,64 @@
 #include <ADC_LL.h>
 
 extern nonVolParameters nonVolPars;
+extern runtimeParameters runtimePars;
 
 void ADC_init(void){
-	RCC->CCIPR |= (3 << 28);	//ADC input clock SYSCLK
-	RCC->AHB2ENR |= (1 << 13);	//enable ADC bus clock
 
-	GPIOA->MODER &= ~( (3 << 2) | (3 << 4) | (3 << 6) );
-	GPIOA->MODER |= (3 << 2) | (3 << 4) | (3 << 6);		//pins PA1, PA2, PA3 into analog mode
-	GPIOB->MODER &= ~(3 << 2);
-	GPIOB->MODER |= (3 << 2);							//pin PB1 to analog mode
+	if( ADC_initialized == 0 ){		//check that ADC is not initialized
+		RCC->CCIPR |= (3 << 28);	//ADC input clock SYSCLK
+		RCC->AHB2ENR |= (1 << 13);	//enable ADC bus clock
 
-	ADC1_COMMON->CCR |= (3 << 16);		//clock -> HCLK/4
-	ADC1_COMMON->CCR |= (1 << 23);		//enable internal temperature sensor
+		GPIOA->MODER &= ~( (3 << 2) | (3 << 4) | (3 << 6) );
+		GPIOA->MODER |= (3 << 2) | (3 << 4) | (3 << 6);		//pins PA1, PA2, PA3 into analog mode
+		GPIOB->MODER &= ~(3 << 2);
+		GPIOB->MODER |= (3 << 2);							//pin PB1 to analog mode
 
-	ADC1->CR &= ~(1 << 29);			//exit deep-power-down state
-	ADC1->CR |= (1 << 28);			//enable ADC voltage regulator
+		ADC1_COMMON->CCR |= (3 << 16);		//clock -> HCLK/4
+		ADC1_COMMON->CCR |= (1 << 23);		//enable internal temperature sensor
 
-	for(uint32_t x=0; x<500; x++);		//datasheet specs MAX time of 20 �s for ADC voltage regulator boot time, just wait long enough
+		ADC1->CR &= ~(1 << 29);			//exit deep-power-down state
+		ADC1->CR |= (1 << 28);			//enable ADC voltage regulator
 
-	ADC1->CR |= (1 << 31);					//start ADC calibration
-	while( !!(ADC1->CR & (1 << 31)) );		//wait for calibration to finish
+		for(uint32_t x=0; x<500; x++);		//datasheet specs MAX time of 20 �s for ADC voltage regulator boot time, just wait long enough
 
-	for(uint8_t x=0; x<5; x++){			//clear ADC_result registers
-		ADC_results[x] = 0;
-		ADC_convertedResults[x] = 0;
+		ADC1->CR |= (1 << 31);					//start ADC calibration
+		while( !!(ADC1->CR & (1 << 31)) );		//wait for calibration to finish
+
+		for(uint8_t x=0; x<5; x++){			//clear ADC_result registers
+			ADC_results[x] = 0;
+			ADC_convertedResults[x] = 0;
+		}
+
+		//if( ADC1->)
+
+		//TS_CAL1 & TS_CAL2 are factory calibration ADC results for 30C and 130C respectively
+		TS_CAL1 = *(uint16_t*)0x1FFF75A8, TS_CAL2 = *(uint16_t*)0x1FFF75CA;
+		temp30Cvoltage = TS_CAL1 * (3000.0 / 4095.0);
+		intTempStep = (TS_CAL2 - TS_CAL1) * (3000.0 / 4095.0) / 100;	//calculate the voltage difference for 1C step
+
+		ADC1->CR |= (1 << 0);			//enable ADC1
+
+		ADC_initialized = 1;		//mark ADC as initialized
 	}
-
-	//TS_CAL1 & TS_CAL2 are factory calibration ADC results for 30C and 130C respectively
-	TS_CAL1 = *(uint16_t*)0x1FFF75A8, TS_CAL2 = *(uint16_t*)0x1FFF75CA;
-	temp30Cvoltage = TS_CAL1 * (3000.0 / 4095.0);
-	intTempStep = (TS_CAL2 - TS_CAL1) * (3000.0 / 4095.0) / 100;	//calculate the voltage difference for 1C step
-
-	ADC1->CR |= (1 << 0);			//enable ADC1
 }
 
-void ADC_deInit(){
+void ADC_deInit(void){
 
-	while( !(ADC1->ISR & (1 << 0)) );		//wait if ADRDY flag is not set, indicating ADC is not ready
-	ADC1->CR |= (1 << 1);					//set ADDIS (adc disable) bit
-	while( !!(ADC1->ISR & (1 << 1)) );		//wait if ADDIS flag is set, indicating ADC is not yet disabled
+	if( ADC_initialized == 1 ){		//check that ADC is initialized
+		while( ADC_isStopped() == 0 );		//wait for ADC to be stopped
+		ADC1->CR |= (1 << 1);					//set ADDIS (adc disable) bit
+		NVIC_DisableIRQ(ADC1_IRQn);				//disable ADC1 interrupt
+		while( !!(ADC1->CR & (1 << 1)) == 1 );		//wait if ADDIS flag is set, indicating ADC is not yet disabled
 
-	ADC1->CR |= (1 << 29);				//enter deep-power-down state, this also disables ADVREGEN bit - ADC voltage regulator
+		ADC1->CR |= (1 << 29);				//enter deep-power-down state, this also disables ADVREGEN bit - ADC voltage regulator
 
-	RCC->AHB2ENR &= ~(1 << 13);			//disable ADC bus clock
-	RCC->CCIPR &= ~(3 << 28);			//ADC input clock NONE
+		RCC->AHB2ENR &= ~(1 << 13);			//disable ADC bus clock
+		RCC->CCIPR &= ~(3 << 28);			//ADC input clock NONE
 
-	//No need to touch GPIO configurations as analog mode is the preferred mode for low-power
+		//No need to touch GPIO configurations as analog mode is the preferred mode for low-power
+		ADC_initialized = 0;		//mark ADC as non-initialized
+	}
 
 }
 
@@ -146,23 +158,61 @@ void ADC_setupSequence(void){
 
 }
 
-void ADC_runSequence(void){
+uint8_t ADC_runSequence(void){
 
-	ADC_conversionNumber = 0;			//zero sequence index
-	ADC1->ISR = (1 << 2) | (1 << 3);	//clear interrupt bits
+	if( runtimePars.ADCrunState ){	//only allow starting of a new sequence of ADC run is enabled
+		ADC_conversionIndex = 0;			//zero sequence index
+		ADC1->ISR = (1 << 2) | (1 << 3);	//clear interrupt bits
 
-	while( !(ADC1->ISR & (1 << 0)) );		//wait if ADRDY flag is not set, indicating ADC is not ready
-	ADC1->CR |= (1 << 2);				//start regular channel conversion/sequence
+		while( !(ADC1->ISR & (1 << 0)) );		//wait if ADRDY flag is not set, indicating ADC is not ready
+		ADC1->CR |= (1 << 2);				//start regular channel conversion/sequence
+		return 1;
+	}
+	else{
+		return 0;
+	}
 
 }
 
-void ADC1_IRQHandler(){
+void ADC_start(void){	//used to start and allow ADC to keep running new regular sequences
+
+	if( runtimePars.ADCrunState == 0 ){
+		runtimePars.ADCrunState = 1;
+		ADC_setupSequence();
+		ADC_runSequence();
+	}
+
+}
+
+void ADC_stop(void){	//used to stop ADC after finishing a regular sequence
+	runtimePars.ADCrunState = 0;
+}
+
+uint8_t ADC_readyCheck(void){
+	if( !!(ADC1->ISR & (1 << 0)) == 1 )
+		return 1;
+	else{
+		return 0;
+	}
+}
+
+
+uint8_t ADC_isStopped(void){
+
+	if( ADC_conversionIndex == 5 )
+		return 1;			//return 1 if ADC is stopped and not running a conversion
+	else
+		return 0;			//return 0 if ADC is not stopped and is able to keep running conversions
+
+}
+
+void ADC1_IRQHandler(void){
 
 	if( !!(ADC1->ISR & (1 << 2)) ){		//End-Of-Conversion (EOC)
-		ADC_results[ADC_conversionNumber] = ADC1->DR;	//save conversion result, this also clear EOC flag by reading the data register
-		ADC_conversionNumber++;			//increment sequence index
+		ADC_results[ADC_conversionIndex] = ADC1->DR;	//save conversion result, this also clear EOC flag by reading the data register
+		ADC_conversionIndex++;			//increment sequence index
 
-		if( ADC_conversionNumber == 5 ){
+		if( ADC_conversionIndex == 5 ){
 			convertADCresults();			//convert RAW ADC results to actual units
 			ADC_runSequence();
 		}
