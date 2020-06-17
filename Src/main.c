@@ -27,6 +27,9 @@ extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 volatile uint8_t runMode = 0;
 
 const uint8_t FW_VERSION[] = {"FW_0.003_RC"};
+//const uint8_t FW_MAJOR = 0;
+//const uint8_t FW_MINOR = 4;
+
 
 nonVolParameters nonVolPars;
 runtimeParameters runtimePars;

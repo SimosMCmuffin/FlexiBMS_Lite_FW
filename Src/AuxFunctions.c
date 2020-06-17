@@ -149,6 +149,11 @@ uint8_t usbPowerPresent(void){		//Start and stop USB service depending on if 5V 
 void chargeControl(void){
 	static uint64_t chargeTick = 0;
 
+	checkChargerVoltageFault();
+	checkBMStemperatureFault();
+	checkNTCtemperatureFault();
+	checkCellVoltageFaults();
+	checkPackVoltageFault();
 
 	//check if charger detected
 	if( runtimePars.chargerConnected == 1 ){
@@ -158,24 +163,11 @@ void chargeControl(void){
 			runtimePars.activeFaults = 0;		//clear active faults
 		}
 
-
-		if( runtimePars.buck5vEnabled == 1 ){				//if 5V buck enabled
-			checkChargerVoltageFault();
-			checkBMStemperatureFault();
-			checkNTCtemperatureFault();
-			checkCellVoltageFaults();
-
-			if( nonVolPars.chgParas.packCellCount == 0 ){
-				checkPackVoltageFault();
-				runtimePars.packVoltageRequest |= (1 << 0);
-			}
-
-			if( runtimePars.activeFaults == 0 && runtimePars.chargingState == 0){
-				//allow charging to start
-				runtimePars.packVoltageRequest |= (1 << 0);
-				runtimePars.chargingState = 1;
-			}
+		if( runtimePars.activeFaults == 0 && runtimePars.chargingState == 0 && runtimePars.buck5vEnabled == 1){
+			//allow charging to start
+			runtimePars.chargingState = 1;
 		}
+
 
 	}
 	else{
@@ -471,17 +463,22 @@ void statusLed(void){
 		}
 		else{
 			__BLUE_LED_OFF;
-			if( runtimePars.activeFaults ){
+			if( runtimePars.activeFaults ){	//if active faults found -> status LED = RED
 				__GREEN_LED_OFF;
 				__RED_LED_ON;
 			}
-			else if( runtimePars.balancing > 0 ){
+			else if( runtimePars.balancing > 0 ){	//if balancing -> status LED = YELLOW
 				__GREEN_LED_ON;
 				__RED_LED_ON;
 			}
-			else if( runtimePars.charging == 1 ){
+			else if( runtimePars.charging == 1 ){	//if charging -> status LED = GREEN
 				__GREEN_LED_ON;
 				__RED_LED_OFF;
+			}
+			else if( runtimePars.latchedFaults == 1 ){	//if there are latched faults -> status LED = MAGENTA
+				__GREEN_LED_OFF;
+				__RED_LED_ON;
+				__BLUE_LED_ON;
 			}
 			else{
 				__GREEN_LED_OFF;
