@@ -302,6 +302,7 @@ void CAN1_process_message() {
 	}
 
 	// Nothing to do for commands_send==1 (forward) and commands_send==2 (process without responding) for now.
+}
 
 uint8_t CAN1_enableLoopBackMode(void){
 
