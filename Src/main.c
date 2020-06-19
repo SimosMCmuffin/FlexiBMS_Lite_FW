@@ -71,6 +71,7 @@ int main(void)
 
 		}
 
+		CAN1_process_message();
 
 		statusLed();		//Control status LED
 

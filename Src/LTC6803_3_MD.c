@@ -154,6 +154,10 @@ void LTC6803_setCellDischarge(uint8_t cell, uint8_t state){		//toggle bleed resi
 	}
 }
 
+uint8_t LTC6803_getCellDischarge(uint8_t cell) {  // return 1 if cell is being balanced, 0 otherwise
+	return !!(LTC_data.CFGR[1 + (cell / 8)] & (1 << (cell % 8)));
+}
+
 uint16_t LTC6803_getCellVoltage(uint8_t cell){				//return specific cell voltage
 
 	return LTC_data.cVoltages[cell];

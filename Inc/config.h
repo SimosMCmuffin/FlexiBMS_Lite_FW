@@ -11,6 +11,8 @@
 #define CAN_ID 10
 
 #define MAX_CELLS 12
+
 #define MAX_CELLS_BALANCING 5
+
 
 #endif /* CONFIG_H_ */

@@ -167,15 +167,11 @@ void chargeControl(void){
 			//allow charging to start
 			runtimePars.chargingState = 1;
 		}
-
-
 	}
 	else{
 		runtimePars.chargingState = 0;
 		runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 	}
-
-
 
 	if( runtimePars.chargingState != 0 && runtimePars.chargingState != 5 && runtimePars.activeFaults != 0 ){
 							//if faults found, set state machine to fault wait state
@@ -756,54 +752,6 @@ void changeRunMode(){
 
 }
 
-void forceRunMode(uint8_t wantedMode){
-	static uint8_t currentMode = 1;	//default mode at beginning RUN MODE W/ USB
-
-	while(currentMode != wantedMode){
-		switch(currentMode){
-
-		case 0: 			//LOW-POWER STANDBY MODE
-			if( wantedMode > 0 ){		//opto_enable found || charger_detected || usb_found)
-				PWR->CR1 &= ~(1 << 14);			//disable low-power run mode
-				while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle
-				changeMSIfreq(8);
-
-				currentMode = 1;
-			}
-			break;
-
-		case 1: 			//RUN MODE
-			if( wantedMode > 1 ){	//if USB 5V found, start 48MHz oscillator
-				RCC->CRRCR |= (1 << 0);			//enable HSI48 clock, used for USB
-				while( !(RCC->CRRCR & (1 << 1)) );	//wait for HSI48 to stabilize
-				MX_USB_DEVICE_Init();
-
-				currentMode = 2;
-			}
-			else if( wantedMode < 1 ){	//opto_enable not found && charger not detected
-				changeMSIfreq(0);
-				PWR->CR1 |= (1 << 14);					//Go into low-power run mode
-
-				currentMode = 0;
-			}
-			break;
-
-		case 2:				//RUN MODE W/ USB
-			if( wantedMode < 1 ){	//if USB 5V not found, then shutdown 48MHz oscillator and switch to run mode 1
-				USBD_DeInit(&hUsbDeviceFS);		//Stop usb service
-				RCC->CRRCR |= (1 << 0);			//disable HSI48 clock, used for USB
-
-				currentMode = 1;
-			}
-			break;
-
-		default: break;
-		}
-	}
-
-}
-
-//cell voltage sort by JanPom (@esk8.news forum)
 void sortCellsByVoltage(uint8_t indices[]) {  // return indices of the cells sorted by voltage, highest to lowest
 	// initialize
 	for (uint8_t i=0; i < nonVolPars.chgParas.packCellCount; i++)
@@ -831,6 +779,7 @@ uint8_t extractUID(uint8_t pos){
 
 	if(pos <= 3 ){
 		number = *(uint32_t*)(0x1FFF7590);
+    
 		tempNumber = number >> (8*pos);
 	}
 	else if( pos >= 4 && pos <= 7){
