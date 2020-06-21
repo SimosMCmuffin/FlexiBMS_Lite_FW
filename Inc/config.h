@@ -1,12 +1,12 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#define HW_NAME "FlexiBMS"
+#define HW_NAME "FlexiBMSlite"
 
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 3
+#define FW_VERSION_MINOR 4
 
-#define STM32_UUID_8 ((uint8_t*)0x1FFFF7AC)  // FIXME
+#define STM32_UUID_8 ((uint8_t*)0x1FFF7590)
 
 #define CAN_ID 10
 

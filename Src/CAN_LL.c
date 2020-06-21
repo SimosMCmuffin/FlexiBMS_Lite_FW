@@ -33,7 +33,7 @@ void CAN1_init(){
 		CAN1->MCR |= (1 << 0);				//request initialization
 		while( !!(CAN1->MSR & (1 << 0)) == 0 );		//wait to enter initialization mode
 
-		CAN1->MCR |= (1 << 6) | (1 << 2);		//automatic bus-off management, *no automatic retransmission*, TX order by chronologically
+		CAN1->MCR |= (1 << 6) | (1 << 4) | (1 << 2);		//automatic bus-off management, *no automatic retransmission*, TX order by chronologically
 
 		CAN1->BTR = 0;
 		CAN1->BTR |= (3 << 24) | (2 << 20) | (11 << 16) | (1 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock, 81%

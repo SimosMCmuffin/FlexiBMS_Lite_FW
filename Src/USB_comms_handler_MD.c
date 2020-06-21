@@ -10,6 +10,7 @@
 #include <dStorage_MD.h>
 #include <ADC_LL.h>
 #include <LTC6803_3_DD.h>
+#include <config.h>
 
 
 #define APP_RX_DATA_SIZE  64
@@ -300,7 +301,10 @@ void report_firmware(void){
 
 	static const uint8_t Ftext1[] = {"FW version: "};
 	appendString(text, Ftext1, &pos);
-	appendString(text, FW_VERSION, &pos);
+	appendUint16(text, FW_VERSION_MAJOR, &pos);
+	text[pos] = '.';
+	pos++;
+	appendUint16(text, FW_VERSION_MINOR, &pos);
 
 	text[pos] = '\r';
 	pos++;
@@ -316,9 +320,8 @@ void report_hardware(void){
 	uint16_t pos = 0;
 	uint8_t* memoryLocation = (uint8_t*)0x1FFF7000;
 
-	//static const uint8_t Ftext1[] = {"HW version: "};
-	//appendString(text, Ftext1, &pos);
-	//appendString(text, FW_VERSION, &pos);
+	static const uint8_t Ftext1[] = {"Board: "HW_NAME" "};
+	appendString(text, Ftext1, &pos);
 	appendStringFromMemory(text, memoryLocation, 0, &pos);
 
 	text[pos] = '\r';
