@@ -8,6 +8,9 @@
 #include "stm32l4xx_hal.h"
 #include <LTC6803_3_DD.h>
 #include <SPI_LL.h>
+#include <main.h>
+
+extern runtimeParameters runtimePars;
 
 void LTC6803_init(void){
 	LTC_data.CFGR[0] = 0xE1;
@@ -151,6 +154,10 @@ void LTC6803_setCellDischarge(uint8_t cell, uint8_t state){		//toggle bleed resi
 	}
 }
 
+uint8_t LTC6803_getCellDischarge(uint8_t cell) {  // return 1 if cell is being balanced, 0 otherwise
+	return !!(LTC_data.CFGR[1 + (cell / 8)] & (1 << (cell % 8)));
+}
+
 uint16_t LTC6803_getCellVoltage(uint8_t cell){				//return specific cell voltage
 
 	return LTC_data.cVoltages[cell];
@@ -179,6 +186,14 @@ uint8_t calculatePEC(uint8_t PEC, uint8_t incoming){		//calculate PEC (Packet Er
 	return PEC;
 }
 
+void LTC6803_runEnable(void){
+	runtimePars.LTC6803runState = 1;
+}
+
+void LTC6803_runDisable(void){
+	runtimePars.LTC6803runState = 0;
+}
+
 void LTC6803_transactionHandler(uint64_t* LTC6803tick){
 	static uint64_t LTC6803resetTick = 0;
 	static uint8_t LTC6803commsState = 0;
@@ -186,7 +201,7 @@ void LTC6803_transactionHandler(uint64_t* LTC6803tick){
 	if( LTC6803resetTick == 0)
 		LTC6803resetTick = HAL_GetTick();
 
-	if( SPI_message == 0 ){
+	if( SPI_message == 0 && runtimePars.LTC6803runState == 1 ){
 		LTC6803resetTick = HAL_GetTick();
 
 		switch( LTC6803commsState ){

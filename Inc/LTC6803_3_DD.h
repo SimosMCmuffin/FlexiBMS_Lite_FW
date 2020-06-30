@@ -39,8 +39,12 @@ void LTC6803_convertTemperatureVoltages(void);
 void LTC6803_transactionHandler(uint64_t*);
 
 void LTC6803_setCellDischarge(uint8_t, uint8_t);
+uint8_t LTC6803_getCellDischarge(uint8_t cell);
 uint16_t LTC6803_getCellVoltage(uint8_t);
 uint16_t LTC6803_getTemperature(void);
 uint8_t calculatePEC(uint8_t, uint8_t);
+
+void LTC6803_runEnable(void);
+void LTC6803_runDisable(void);
 
 #endif /* LTC6803_3_DD_H_ */
