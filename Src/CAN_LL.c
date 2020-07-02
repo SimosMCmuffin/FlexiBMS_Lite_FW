@@ -65,30 +65,10 @@ void CAN1_deInit(){
 uint8_t CAN1_attempt_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 
 	if( !!(CAN1->TSR & (7 << 26)) && CAN_initialized == 1 ){		//Check that at least one TX mailbox is empty and that CAN is iniatilized
-		uint8_t TX_empty = 0;// (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
-
-
-		if( !!(CAN1->TSR & (1 << 26)) == 1 )
-			TX_empty = 0;
-		else if( !!(CAN1->TSR & (1 << 27)) == 1 )
-			TX_empty = 1;
-		else
-			TX_empty = 2;
-
+		uint8_t TX_empty = (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
 
 		CAN1->sTxMailBox[TX_empty].TIR = 0;
-
-
-		if( ID <= 0x7FF ){		//decide whether to use standard or extended ID frame based on the argument ID's size
-			CAN1->sTxMailBox[TX_empty].TIR = (ID << 21);	//set CAN ID (standard, 11-bit)
-		}
-		else if( ID >= 0x800 && ID <= 0x1FFFFFFF){
-			CAN1->sTxMailBox[TX_empty].TIR = (ID << 3);	//set CAN ID (extended, 29-bit)
-			CAN1->sTxMailBox[TX_empty].TIR |= (1 << 2);	//use extended CAN ID
-		}
-		else{
-			return 0;	//return 0 if ID out of range
-		}
+		CAN1->sTxMailBox[TX_empty].TIR = (ID << 3) | (1 << 2);	//set CAN ID, extended frame
 
 		CAN1->sTxMailBox[TX_empty].TDTR = 0;
 		CAN1->sTxMailBox[TX_empty].TDTR = (length << 0);	//set data length
