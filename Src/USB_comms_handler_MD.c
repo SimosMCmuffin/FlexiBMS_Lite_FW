@@ -216,10 +216,10 @@ void set_parameter(float* value, _parameter_ID parameterID){
 		nonVolPars.genParas.stayActiveTime = (uint16_t)*value;
 		break;
 	case alwaysBalancing:
-		nonVolPars.genParas.alwaysBalancing = (uint16_t)*value;
+		nonVolPars.genParas.alwaysBalancing = (uint8_t)*value;
 		break;
 	case keep5ValwaysOn:
-		nonVolPars.genParas.always5vRequest = (uint16_t)*value;
+		nonVolPars.genParas.always5vRequest = (uint8_t)*value;
 		runtimePars.buck5vRequest = ((uint16_t)*value << always5vRequest);
 		break;
 	default:
