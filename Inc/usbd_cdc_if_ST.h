@@ -103,7 +103,7 @@ extern USBD_CDC_ItfTypeDef USBD_Interface_fops_FS;
   * @{
   */
 
-uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
+uint8_t CDC_Transmit_FS(const uint8_t* Buf, uint16_t Len);
 int8_t VCP_retrieveInputData(uint8_t*, uint32_t*);
 
 /* USER CODE BEGIN EXPORTED_FUNCTIONS */

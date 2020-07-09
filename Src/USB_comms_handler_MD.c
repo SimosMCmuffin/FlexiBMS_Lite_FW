@@ -862,7 +862,7 @@ void appendFault(uint8_t* text, uint16_t indexNo, uint16_t* pos){	//fault relate
 
 void appendString(uint8_t* text, const uint8_t* string, uint16_t* pos){
 
-	for(uint8_t x=0; x<strlen(string); x++){
+	for(uint8_t x=0; x<strlen((const char*)string); x++){
 		text[*pos] = string[x];
 		*pos += 1;
 	}
