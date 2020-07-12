@@ -8,6 +8,7 @@
 #include "AuxFunctions.h"
 #include "ADC_LL.h"
 #include "LTC6803_3_DD.h"
+#include "dStorage_MD.h"
 
 #define CELSIUS_TO_KELVIN_1E1 2732  // add 273.2 to Celsius to get Kelvin
 
@@ -41,6 +42,8 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 	uint8_t send_buffer[128];
 
 	COMM_PACKET_ID packet_id = data[0];
+	data++;
+	len--;
 
 	switch (packet_id) {
 	case COMM_FW_VERSION:
@@ -105,6 +108,85 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 			buffer_append_int16(send_buffer, (int16_t) (LTC6803_getCellVoltage(i) * sign), &ind);
 		}
 
+		send_buffer[ind++] = CAN_ID;
+		commands_send_packet(send_buffer, ind);
+		break;
+	case COMM_SET_BMS_CONF:
+		nonVolPars.chgParas.packCellCount = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.maxChgCurr = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.termCurr = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.minCellVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.maxCellVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.minChgVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.maxChgVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.minPackVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.maxPackVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.termCellVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.termPackVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.cellBalVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.cellDiffVolt = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.minNTCtemp = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.maxNTCtemp = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.minBMStemp = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.maxBMStemp = buffer_get_uint16(data, &ind);
+		nonVolPars.chgParas.refreshWaitTime = buffer_get_uint16(data, &ind);
+		for (size_t i = 0; i < sizeof(nonVolPars.adcParas.ADC_chan_gain) / sizeof(nonVolPars.adcParas.ADC_chan_gain[0]); ++i) {
+			nonVolPars.adcParas.ADC_chan_gain[i] = buffer_get_float32_auto(data, &ind);
+		}
+		for (size_t i = 0; i < sizeof(nonVolPars.adcParas.ADC_chan_offset) / sizeof(nonVolPars.adcParas.ADC_chan_offset[0]); ++i) {
+			nonVolPars.adcParas.ADC_chan_offset[i] = buffer_get_float32_auto(data, &ind);
+		}
+		nonVolPars.adcParas.extNTCbetaValue = buffer_get_uint16(data, &ind);
+		nonVolPars.adcParas.AdcOversampling = buffer_get_uint16(data, &ind);
+		nonVolPars.genParas.stayActiveTime = buffer_get_uint16(data, &ind);
+		nonVolPars.genParas.alwaysBalancing = data[ind++];
+		nonVolPars.genParas.always5vRequest = data[ind++];
+		nonVolPars.genParas.storageCellVoltage = buffer_get_uint16(data, &ind);
+		nonVolPars.genParas.timeToStorageDischarge = buffer_get_uint16(data, &ind);
+		ind = 0;
+		send_buffer[ind++] = packet_id;
+		send_buffer[ind++] = CAN_ID;
+		commands_send_packet(send_buffer, ind);
+		break;
+	case COMM_GET_BMS_CONF:
+		send_buffer[ind++] = packet_id;
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.packCellCount, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.maxChgCurr, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.termCurr, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.minCellVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.maxCellVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.minChgVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.maxChgVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.minPackVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.maxPackVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.termCellVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.termPackVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.cellBalVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.cellDiffVolt, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.minNTCtemp, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.maxNTCtemp, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.minBMStemp, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.maxBMStemp, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.refreshWaitTime, &ind);
+		for (size_t i = 0; i < sizeof(nonVolPars.adcParas.ADC_chan_gain) / sizeof(nonVolPars.adcParas.ADC_chan_gain[0]); ++i) {
+			buffer_append_float32_auto(send_buffer, nonVolPars.adcParas.ADC_chan_gain[i], &ind);
+		}
+		for (size_t i = 0; i < sizeof(nonVolPars.adcParas.ADC_chan_offset) / sizeof(nonVolPars.adcParas.ADC_chan_offset[0]); ++i) {
+			buffer_append_float32_auto(send_buffer, nonVolPars.adcParas.ADC_chan_offset[i], &ind);
+		}
+		buffer_append_uint16(send_buffer, nonVolPars.adcParas.extNTCbetaValue, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.adcParas.AdcOversampling, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.genParas.stayActiveTime, &ind);
+		send_buffer[ind++] = nonVolPars.genParas.alwaysBalancing;
+		send_buffer[ind++] = nonVolPars.genParas.always5vRequest;
+		buffer_append_uint16(send_buffer, nonVolPars.genParas.storageCellVoltage, &ind);
+		buffer_append_uint16(send_buffer, nonVolPars.genParas.timeToStorageDischarge, &ind);
+		send_buffer[ind++] = CAN_ID;
+		commands_send_packet(send_buffer, ind);
+		break;
+	case COMM_STORE_BMS_CONF:
+		saveNonVolatileParameters(&nonVolPars);
+		send_buffer[ind++] = packet_id;
 		send_buffer[ind++] = CAN_ID;
 		commands_send_packet(send_buffer, ind);
 		break;

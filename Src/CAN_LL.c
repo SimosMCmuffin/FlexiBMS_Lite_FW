@@ -16,6 +16,9 @@
 
 #define CAN_TRANSMIT_MAX_ATTEMPTS 100
 
+#define RX_BUFFER_SIZE 512
+static uint8_t rx_buffer[RX_BUFFER_SIZE];
+
 static unsigned int rx_buffer_last_id;
 
 void CAN1_init(){
@@ -268,19 +271,58 @@ void CAN1_process_message() {
 	uint8_t controller_id = id & 0xFF;
 	CAN_PACKET_ID cmd = id >> 8;
 
-	if (controller_id != CAN_ID || cmd != CAN_PACKET_PROCESS_SHORT_BUFFER)
+	if (controller_id != CAN_ID)
 		return;
 
-	if (length < 3)
+	int ind = 0;
+	uint8_t* packet_data = NULL;
+	unsigned int packet_length = 0;
+	uint8_t commands_send = 0;
+	switch (cmd) {
+	case CAN_PACKET_PROCESS_SHORT_BUFFER:
+		rx_buffer_last_id = data[ind++];
+		commands_send = data[ind++];
+		packet_data = data + ind;
+		packet_length = length - ind;
+		break;
+	case CAN_PACKET_FILL_RX_BUFFER:
+		memcpy(rx_buffer + data[0], data + 1, length - 1);
 		return;
+	case CAN_PACKET_FILL_RX_BUFFER_LONG:
+		{
+			unsigned int rxbuf_ind = (unsigned int)data[0] << 8;
+			rxbuf_ind |= data[1];
+			if (rxbuf_ind < RX_BUFFER_SIZE) {
+				memcpy(rx_buffer + rxbuf_ind, data + 2, length - 2);
+			}
+		}
+		return;
+	case CAN_PACKET_PROCESS_RX_BUFFER:
+		rx_buffer_last_id = data[ind++];
+		commands_send = data[ind++];
+		unsigned int rxbuf_len = (unsigned int)data[ind++] << 8;
+		rxbuf_len |= (unsigned int)data[ind++];
+		if (rxbuf_len > RX_BUFFER_SIZE) {
+			return;
+		}
+		uint8_t crc_high = data[ind++];
+		uint8_t crc_low = data[ind++];
 
-	rx_buffer_last_id = data[0];
-	uint8_t commands_send = data[1];
-
-	if (commands_send == 0) {
-		commands_process_packet(data + 2, length - 2, send_packet_wrapper);
+		if (crc16(rx_buffer, rxbuf_len)
+				!= ((unsigned short) crc_high << 8
+						| (unsigned short) crc_low)) {
+			return;
+		}
+		packet_data = rx_buffer;
+		packet_length = rxbuf_len;
+		break;
+	default:
+		return;
 	}
 
+	if (commands_send == 0) {
+		commands_process_packet(packet_data, packet_length, send_packet_wrapper);
+	}
 	// Nothing to do for commands_send==1 (forward) and commands_send==2 (process without responding) for now.
 }
 
