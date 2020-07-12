@@ -144,10 +144,10 @@ void set_parameter(float* value, _parameter_ID parameterID){
 		nonVolPars.chgParas.maxChgVolt = (uint16_t)*value;
 		break;
 	case minPackVolt:
-		nonVolPars.chgParas.maxChgVolt = (uint16_t)*value;
+		nonVolPars.chgParas.minPackVolt = (uint16_t)*value;
 		break;
 	case maxPackVolt:
-		nonVolPars.chgParas.maxChgVolt = (uint16_t)*value;
+		nonVolPars.chgParas.maxPackVolt = (uint16_t)*value;
 		break;
 	case termCellVolt:
 		nonVolPars.chgParas.termCellVolt = (uint16_t)*value;
