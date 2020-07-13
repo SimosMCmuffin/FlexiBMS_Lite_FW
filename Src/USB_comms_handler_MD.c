@@ -249,7 +249,7 @@ void report_faults(void){
 	appendString(text, Ftext1, &pos);
 
 	for(uint8_t x=0; x<fault_numberOfElements; x++){
-		if( !!(runtimePars.latchedFaults & (1 << x)) ){
+		if( !!(runtimePars.latchedFaults & ((uint64_t)1 << x)) ){
 			appendFault(text, x, &pos);
 		}
 	}
@@ -257,7 +257,7 @@ void report_faults(void){
 	appendString(text, Ftext2, &pos);
 
 	for(uint8_t x=0; x<fault_numberOfElements; x++){
-		if( !!(runtimePars.activeFaults & (1 << x)) ){
+		if( !!(runtimePars.activeFaults & ((uint64_t)1 << x)) ){
 			appendFault(text, x, &pos);
 		}
 	}
@@ -841,8 +841,8 @@ void appendFault(uint8_t* text, uint16_t indexNo, uint16_t* pos){	//fault relate
 	case fault_lowBMStemp:;
 		static const uint8_t description28[] = {"LOW_BMS_TEMP:"};
 		appendString(text, description28, pos);
-	break;
-		case fault_highBMStemp:;
+		break;
+	case fault_highBMStemp:;
 		static const uint8_t description29[] = {"HIGH_BMS_TEMP:"};
 		appendString(text, description29, pos);
 		break;
