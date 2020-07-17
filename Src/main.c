@@ -96,7 +96,7 @@ int main(void)
 					hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
 					ADC_init();						//init ADC low level HW
 					ADC_start();
-					HAL_Delay(3);
+					HAL_Delay(200);
 					ADC_stop();
 					ADC_deInit();
 					runtimePars.chargerVoltageRequest &= ~(1 << 0);
@@ -107,9 +107,9 @@ int main(void)
 				usbPowerPresent();		//check if 5V is detected from the USB connector
 				updateOptoState();		//read state of the Opto-isolator
 				updateActiveTimer();	//update activeTimer flags
-				detectCharger();
+				detectCharger();		//check if charger connected
 				changeRunMode();		//change running modes based on some flags
-				HAL_Delay(1);
+				HAL_Delay(160);			//wait 160ms
 			}
 		}
 

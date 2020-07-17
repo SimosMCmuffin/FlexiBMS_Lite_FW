@@ -206,12 +206,20 @@ void chargeControl(void){
 					runtimePars.chargingState = 3;
 					break;
 				}
-			}
-			chargeTick = HAL_GetTick() + 300;
-			__ENABLE_CHG;
-			runtimePars.charging = 1;
 
-			runtimePars.chargingState = 2;
+			}
+
+			if( runtimePars.activeFaults != 0 ){	//before opening charging FETs, check that there aren't faults
+				runtimePars.chargingState = 5;
+			}
+			else{
+				chargeTick = HAL_GetTick() + 300;
+				__ENABLE_CHG;
+				runtimePars.charging = 1;
+
+				runtimePars.chargingState = 2;
+			}
+
 		}
 		break;
 
@@ -714,7 +722,9 @@ void changeRunMode(){
 			while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle
 			changeMSIfreq(8);				//switch MSI to 16MHz
 
+			SysTick_Config(16000);		//update systick to 1000Hz tick rate with 16MHz clock
 			InitPeripherals();
+
 
 			runtimePars.chargerVoltageRequest |= (1 << 0);
 			runtimePars.packVoltageRequest |= (1 << 0);
@@ -735,6 +745,7 @@ void changeRunMode(){
 			changeMSIfreq(0);					//switch MSI to 100kHz
 			PWR->CR1 |= (1 << 14);					//Go into low-power run mode
 
+			SysTick_Config(100);			//update systick to 1000Hz tick rate with 100kHz clock
 			deInitPeripherals();
 
 			runtimePars.chargerVoltageRequest &= ~(1 << 0);
