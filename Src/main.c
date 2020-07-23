@@ -54,12 +54,13 @@ int main(void)
 	while (1)
 	{
 
-		if( systemTick + 25 <= HAL_GetTick() ){		//go in here at max every 20ms
+		if( systemTick + 25 <= HAL_GetTick() ){		//go in here at max every 25ms
 			systemTick = HAL_GetTick();
 
 			usbPowerPresent();		//check if 5V is detected from the USB connector
 			updateOptoState();		//read state of the Opto-isolator
 			updateActiveTimer();	//update activeTimer flags
+			updateStorageTimer();	//update storageDischargeTimer flags
 			changeRunMode();		//change running modes based on some flags
 
 		}
@@ -107,6 +108,7 @@ int main(void)
 				usbPowerPresent();		//check if 5V is detected from the USB connector
 				updateOptoState();		//read state of the Opto-isolator
 				updateActiveTimer();	//update activeTimer flags
+				updateStorageTimer();	//update storageDischargeTimer flags
 				detectCharger();		//check if charger connected
 				changeRunMode();		//change running modes based on some flags
 				HAL_Delay(160);			//wait 160ms

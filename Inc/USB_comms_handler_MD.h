@@ -48,6 +48,10 @@ typedef enum
 	stayActiveTime,
 	keep5ValwaysOn,
 
+	balTempRatio,
+	storageCellVoltage,
+	timeToStorageDischarge,
+
 	numberOfElements
 }_parameter_ID;
 
@@ -84,6 +88,7 @@ void report_parameters(_parameter_ID, uint8_t);
 
 float readFloat(uint8_t*, uint32_t*, uint8_t);
 void appendUint16(uint8_t*, uint16_t, uint16_t*);
+void appendUint64(uint8_t*, uint64_t, uint16_t*);
 void appendHex32(uint8_t*, uint32_t, uint16_t*);
 void appendUID(uint8_t*, uint16_t*);
 void appendStringFromMemory(uint8_t*, uint8_t*, uint8_t, uint16_t*);

@@ -34,7 +34,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->genParas.stayActiveTime = 100;
 		nonVols->genParas.alwaysBalancing = 0;
 		nonVols->genParas.always5vRequest = 0;
-		nonVols->genParas.storageCellVoltage = 0;
+		nonVols->genParas.storageCellVoltage = 3800;
 		nonVols->genParas.timeToStorageDischarge = 0;
 
 		nonVols->chgParas.packCellCount = 12;
@@ -44,6 +44,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->chgParas.termPackVolt = 50400;
 		nonVols->chgParas.maxChgCurr = 6500;
 		nonVols->chgParas.termCurr = 300;
+		nonVols->chgParas.balTempRatio = 3;
 
 		nonVols->chgParas.minCellVolt = 2000;
 		nonVols->chgParas.maxCellVolt = 4250;
@@ -87,9 +88,11 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 
 	runtimePars->charging = 0;
 	runtimePars->balancing = 0;
-	runtimePars->storageDischarging = 0;
+	runtimePars->storageDischarged = 1;
+	runtimePars->storageTimerState = 1;
 
 	runtimePars->activeTick = HAL_GetTick();
+	runtimePars->storageTick = HAL_GetTick();
 }
 
 uint8_t countCells(void){			//Count how many cells are above
@@ -336,6 +339,24 @@ void balanceControl(void){
 		uint8_t cellIndices[MAX_CELLS];
 		sortCellsByVoltage(cellIndices);
 
+		//calculate how many balancing resistors can be used based on the "balTempRatio", maxBMStemp and current BMS temp
+		int8_t balTempRatio_allowed = 0;
+		if( nonVolPars.chgParas.balTempRatio != 0){	//check if balTempRatio is used
+
+			if( LTC6803_getTemperature() >= ADC_convertedResults[mcuInternalTemp] ){	//use the higher PCB temperature
+				balTempRatio_allowed = nonVolPars.chgParas.maxBMStemp - LTC6803_getTemperature();
+			}
+			else{
+				balTempRatio_allowed = nonVolPars.chgParas.maxBMStemp - ADC_convertedResults[mcuInternalTemp];
+			}
+			balTempRatio_allowed /= nonVolPars.chgParas.balTempRatio;	//divide the difference between current BMS temp and max BMS temp for max allowed resistors
+
+		}
+		else{										//otherwise use the static max (5)
+			balTempRatio_allowed = MAX_CELLS_BALANCING;
+		}
+
+
 		runtimePars.balancing = 0;
 
 		for(uint8_t x=0; x < nonVolPars.chgParas.packCellCount; x++){
@@ -344,7 +365,7 @@ void balanceControl(void){
 			if( 	(LTC6803_getCellVoltage(i) >= nonVolPars.chgParas.cellBalVolt) &&						//if cell voltage above balance voltage
 					(LTC6803_getCellVoltage(i) > (lowestCell(nonVolPars.chgParas.packCellCount) + nonVolPars.chgParas.cellDiffVolt)) ){	//and cell difference greater than allowed compared to the lowest cell
 
-				if( runtimePars.balancing < MAX_CELLS_BALANCING ){	//allow max of 5 resistors to balance, to help reduce the thermal generation
+				if( runtimePars.balancing < balTempRatio_allowed ){	//allow max of 6 resistors to balance, to help reduce the thermal generation
 					LTC6803_setCellDischarge(i, 1);
 				}
 				else{
@@ -354,13 +375,58 @@ void balanceControl(void){
 			}
 			else
 				LTC6803_setCellDischarge(i, 0);
+
 		}
 
-		if( runtimePars.balancing > 0 ){
-			runtimePars.buck5vRequest |= (1 << balancing5vRequest);
+	}
+	else if( 	runtimePars.storageDischarged == 0 && runtimePars.storageTimerState == 0 &&
+				nonVolPars.chgParas.packCellCount != 0 && LTC6803_getCellVoltage(0) != 0 ){	//storage discharge balance control
+		uint8_t cellIndices[MAX_CELLS];
+		sortCellsByVoltage(cellIndices);
+
+		//calculate how many balancing resistors can be used based on the "balTempRatio", maxBMStemp and current BMS temp
+		int8_t balTempRatio_allowed = 0;
+		if( nonVolPars.chgParas.balTempRatio != 0){	//check if balTempRatio is used
+
+			if( LTC6803_getTemperature() >= ADC_convertedResults[mcuInternalTemp] ){	//use the higher PCB temperature
+				balTempRatio_allowed = nonVolPars.chgParas.maxBMStemp - LTC6803_getTemperature();
+			}
+			else{
+				balTempRatio_allowed = nonVolPars.chgParas.maxBMStemp - ADC_convertedResults[mcuInternalTemp];
+			}
+			balTempRatio_allowed /= nonVolPars.chgParas.balTempRatio;	//divide the difference between current BMS temp and max BMS temp for max allowed resistors
+
 		}
-		else{
-			runtimePars.buck5vRequest &= ~(1 << balancing5vRequest);
+		else{										//otherwise use the static max
+			balTempRatio_allowed = MAX_CELLS_BALANCING;
+		}
+
+
+		runtimePars.balancing = 0;
+		uint8_t notBalanced = 0;
+
+		for(uint8_t x=0; x < nonVolPars.chgParas.packCellCount; x++){
+
+			uint8_t i = cellIndices[x];
+			if( LTC6803_getCellVoltage(i) > nonVolPars.genParas.storageCellVoltage ){
+				notBalanced++;
+
+				if( runtimePars.balancing < balTempRatio_allowed ){	//allow max of 6 resistors to balance, to help reduce the thermal generation
+					LTC6803_setCellDischarge(i, 1);
+				}
+				else{
+					LTC6803_setCellDischarge(i, 0);
+				}
+
+				runtimePars.balancing++;
+			}
+			else
+				LTC6803_setCellDischarge(i, 0);
+
+		}
+
+		if( notBalanced == 0){	//if no cell needs balancing, indicating that they're below the storageDischargeVoltage
+			runtimePars.storageDischarged = 1;	//flag storageDischarge as completed
 		}
 
 	}
@@ -370,6 +436,14 @@ void balanceControl(void){
 			LTC6803_setCellDischarge(x, 0);
 		}
 	}
+
+	if( runtimePars.balancing > 0 ){
+		runtimePars.buck5vRequest |= (1 << balancing5vRequest);
+	}
+	else{
+		runtimePars.buck5vRequest &= ~(1 << balancing5vRequest);
+	}
+
 }
 
 void hwRequestControl(void){
@@ -506,11 +580,33 @@ void updateActiveTimer(void){
 		runtimePars.activeTick = HAL_GetTick() + 500;
 	}
 
-	if( (runtimePars.activeTick + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS )) <= HAL_GetTick() ){
+	if( 	(runtimePars.activeTick + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS )) <= HAL_GetTick() &&
+			runtimePars.storageDischarged == 1 ){
 		runtimePars.activeTimerState = 0;	//active time window passed
 	}
 	else{
 		runtimePars.activeTimerState = 1;	//active time window not-passed
+	}
+}
+
+void updateStorageTimer(void){
+
+	if( runtimePars.chargerConnected == 1 ){
+		runtimePars.storageTick = HAL_GetTick();
+	}
+
+	if( 	((runtimePars.storageTick + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS )) <= HAL_GetTick()) &&
+			nonVolPars.genParas.timeToStorageDischarge != 0 ){
+		if( runtimePars.storageTimerState == 1 ){
+		runtimePars.storageTimerState = 0;	//storage time window passed
+		runtimePars.storageDischarged = 0;	//clear storageDischarge state when starting storagedischarging
+		}
+	}
+	else{
+		if( runtimePars.storageTimerState == 0 ){
+		runtimePars.storageTimerState = 1;	//storage time window not-passed
+		runtimePars.storageDischarged = 1;	//set storageDischarged to true if time window not-passed
+		}
 	}
 }
 
@@ -716,7 +812,7 @@ void changeRunMode(){
 	switch( runtimePars.currentRunMode ){
 
 	case 0: 			//LOW-POWER STANDBY MODE
-		if( runtimePars.optoActive == 1 || runtimePars.chargerConnected == 1 || runtimePars.usbConnected == 1 ){
+		if( runtimePars.optoActive == 1 || runtimePars.chargerConnected == 1 || runtimePars.usbConnected == 1 || runtimePars.activeTimerState == 1 ){
 																				//(opto_enable found || charger_detected || usb_found)
 			PWR->CR1 &= ~(1 << 14);			//disable low-power run mode
 			while( !!(PWR->SR2 & (1 << 9)) );	//wait for voltage regulator to settle

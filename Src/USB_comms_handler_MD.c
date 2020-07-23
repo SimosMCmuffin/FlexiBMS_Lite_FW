@@ -110,7 +110,7 @@ void USB_checkForNewMessages(){
 	}
 
 	if( runtimePars.statePrintout == 1 && runtimePars.usbConnected == 1 ){
-		if( liveTick < HAL_GetTick() ){
+		if( liveTick <= HAL_GetTick() ){
 			liveTick = HAL_GetTick() + runtimePars.statusTick;
 			report_state();
 		}
@@ -221,6 +221,15 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case keep5ValwaysOn:
 		nonVolPars.genParas.always5vRequest = (uint8_t)*value;
 		runtimePars.buck5vRequest = ((uint16_t)*value << always5vRequest);
+		break;
+	case balTempRatio:
+		nonVolPars.chgParas.balTempRatio = (uint16_t)*value;
+		break;
+	case storageCellVoltage:
+		nonVolPars.genParas.storageCellVoltage = (uint16_t)*value;
+		break;
+	case timeToStorageDischarge:
+		nonVolPars.genParas.timeToStorageDischarge = (uint16_t)*value;
 		break;
 	default:
 		report_error(error_invalidMessageID);
@@ -669,7 +678,24 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		static const uint8_t description32[] = {" (0/1, force 5V regulator always on when battery connected, Boolean)\r\n"};
 		appendString(text, description32, pos);
 		break;
-	default:
+	case balTempRatio:
+		appendUint16(text, nonVolPars.chgParas.balTempRatio, pos);
+		static const uint8_t description34[] = {" (balancing temperature ratio, dynamically adjusts the max allowed balancing resistors based on BMS temperature, set to 0 to use static maximum, Uint)\r\n"};
+		appendString(text, description34, pos);
+		break;
+	case storageCellVoltage:
+		appendUint16(text, nonVolPars.genParas.storageCellVoltage, pos);
+		static const uint8_t description35[] = {" (Storage discharge voltage; mV (milliVolts), if storage discharge enabled, then pack will be discharged to this voltage, Uint)\r\n"};
+		appendString(text, description35, pos);
+		break;
+	case timeToStorageDischarge:
+		appendUint16(text, nonVolPars.genParas.timeToStorageDischarge, pos);
+		static const uint8_t description36[] = {" (h (Hours), how long to wait from last CHARGING event to start discharging the pack to the storage voltage, set to 0 to disable, Uint)\r\n"};
+		appendString(text, description36, pos);
+		break;
+	default:;
+		static const uint8_t description33[] = {" (parameter error)\r\n"};
+		appendString(text, description33, pos);
 		break;
 	}
 
@@ -871,6 +897,29 @@ void appendString(uint8_t* text, const uint8_t* string, uint16_t* pos){
 
 void appendUint16(uint8_t* text, uint16_t number, uint16_t* pos){
 	uint8_t temp[5] = {0, 0, 0, 0, 0}, index = 0;
+
+	if( number == 0){
+		text[*pos] = '0';
+		*pos += 1;
+	}
+	else{
+		while(number > 0){
+			temp[index] = number % 10;
+			number /= 10;
+			index++;
+		}
+
+		while(index > 0){
+			text[*pos] = '0' + temp[index-1];
+			*pos += 1;
+			index--;
+		}
+	}
+
+}
+
+void appendUint64(uint8_t* text, uint64_t number, uint16_t* pos){
+	uint8_t temp[20] = {0}, index = 0;
 
 	if( number == 0){
 		text[*pos] = '0';

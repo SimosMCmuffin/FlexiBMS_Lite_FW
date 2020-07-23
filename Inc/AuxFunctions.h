@@ -31,6 +31,7 @@ uint8_t checkMaxCurrentFault(void);
 uint8_t getHWversion(void);
 
 void updateActiveTimer(void);
+void updateStorageTimer(void);
 
 void sortCellsByVoltage(uint8_t*);
 

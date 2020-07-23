@@ -48,7 +48,7 @@ extern "C" {
 #define __RED_LED_ON ( GPIOB->BSRR |= (1 << 29) )
 #define __RED_LED_OFF ( GPIOB->BSRR |= (1 << 13) )
 
-#define __TIME_HOUR_TICKS ( 86400000 )
+#define __TIME_HOUR_TICKS ( 3600000 )
 
 #include "stm32l4xx_hal.h"
 
@@ -129,6 +129,8 @@ typedef struct _chargingParameters {
 	uint16_t cellBalVolt;	//mV (milliVolts), allow balancing once a cell goes above this voltage
 	uint16_t cellDiffVolt;	//mV (milliVolts), maximum allowed voltage difference between cell groups, balance if difference bigger
 
+	uint16_t balTempRatio;	//K (Kelvin), balancing temperature ratio of how many simultaneous resistors can be on at any time
+
 	uint16_t minNTCtemp;		//K (Kelvin), if NTC probe enabled, the minimum temperature above which charging is allowed
 	uint16_t maxNTCtemp;		//K (Kelvin), if NTC probe enabled, the maximum temperature below which charging is allowed
 	uint16_t minBMStemp;		//K (Kelvin), PCB temperature, the minimum temperature above which charging is allowed
@@ -168,6 +170,8 @@ typedef struct _runtimeParameters {
 	uint16_t chargerConnected;
 	uint16_t optoActive;
 	uint16_t activeTimerState;
+	uint16_t storageTimerState;
+	uint16_t storageDischarged;
 	uint16_t chargingState;
 	uint16_t currentRunMode;
 	uint64_t activeFaults;
@@ -182,9 +186,9 @@ typedef struct _runtimeParameters {
 
 	uint16_t charging;
 	uint16_t balancing;
-	uint16_t storageDischarging;
 
 	uint64_t activeTick;
+	uint64_t storageTick;
 
 } runtimeParameters;
 
