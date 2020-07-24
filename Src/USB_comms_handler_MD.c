@@ -395,9 +395,7 @@ void report_state(void){
 	text[pos] = ':';
 	pos++;
 
-	appendUint16(text, runtimePars.chargingState, &pos);
-	text[pos] = ':';
-	pos++;
+	appendChargingState(text, runtimePars.chargingState, &pos);
 
 	text[pos] = '\r';
 	pos++;
@@ -696,6 +694,39 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 	default:;
 		static const uint8_t description33[] = {" (parameter error)\r\n"};
 		appendString(text, description33, pos);
+		break;
+	}
+
+}
+
+void appendChargingState(uint8_t* text, uint16_t state, uint16_t* pos){
+
+	switch(state){
+	case notCharging:;
+		static const uint8_t description0[] = {"notCharging:"};
+		appendString(text, description0, pos);
+		break;
+	case chargingStarting:;
+		static const uint8_t description1[] = {"chargingStarting:"};
+		appendString(text, description1, pos);
+		break;
+	case charging:;
+		static const uint8_t description2[] = {"charging:"};
+		appendString(text, description2, pos);
+		break;
+	case chargingEnd:;
+		static const uint8_t description3[] = {"chargingEnd:"};
+		appendString(text, description3, pos);
+		break;
+	case chargerDisconnected:;
+		static const uint8_t description4[] = {"chargerDisconnected:"};
+		appendString(text, description4, pos);
+		break;
+	case faultState:;
+		static const uint8_t description5[] = {"faultState:"};
+		appendString(text, description5, pos);
+		break;
+	default:
 		break;
 	}
 

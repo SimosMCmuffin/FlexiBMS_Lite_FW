@@ -112,6 +112,16 @@ typedef enum
 	opto5vRequest
 }_5vRequest_ID;
 
+enum
+{
+	notCharging = 0,
+	chargingStarting,
+	charging,
+	chargingEnd,
+	chargerDisconnected,
+	faultState
+}_chargingState_ID;
+
 typedef struct _chargingParameters {
 	uint16_t packCellCount;	//# number of series cells in the battery pack
 	uint16_t maxChgCurr;	//mA (milliAmps), maximum current allowed to flow to battery

@@ -95,6 +95,7 @@ void appendStringFromMemory(uint8_t*, uint8_t*, uint8_t, uint16_t*);
 void appendFloat(uint8_t*, float, uint16_t*);
 void appendString(uint8_t*, const uint8_t*, uint16_t*);
 void appendParameter(uint8_t*, uint16_t, uint16_t*);
+void appendChargingState(uint8_t*, uint16_t, uint16_t*);
 void appendFault(uint8_t*, uint16_t, uint16_t*);
 
 
