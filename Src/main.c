@@ -65,9 +65,9 @@ int main(void)
 
 		}
 
-		CAN1_process_message();
-
 		statusLed();		//Control status LED
+
+		CAN1_process_message();
 
 		hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
 

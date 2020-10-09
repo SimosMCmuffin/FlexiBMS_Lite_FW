@@ -60,6 +60,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->chgParas.minNTCtemp = 0;
 
 		nonVols->chgParas.refreshWaitTime = 30;
+		nonVols->genParas.canActivityTick = 0;
 
 	}
 
@@ -537,7 +538,12 @@ void statusLed(void){
 		if( state == 0 ){
 			__RED_LED_OFF;
 			__GREEN_LED_OFF;
-			if( runtimePars.usbConnected == 1 ){
+			if( nonVolPars.genParas.canActivityTick == 1 && CAN1_rxAvailable() == 1 ){	//CAN activity cyan flick
+				__GREEN_LED_ON;
+				__RED_LED_OFF;
+				__BLUE_LED_ON;
+			}
+			else if( runtimePars.usbConnected == 1 ){	//USB connected
 				__BLUE_LED_ON;
 			}
 			else{
@@ -546,7 +552,12 @@ void statusLed(void){
 		}
 		else{
 			__BLUE_LED_OFF;
-			if( runtimePars.activeFaults != 0 || runtimePars.chargingState == faultState ){	//if active faults found -> status LED = RED
+			if( nonVolPars.genParas.canActivityTick == 1 && CAN1_rxAvailable() == 1 ){	//CAN activity cyan flick
+				__GREEN_LED_ON;
+				__RED_LED_OFF;
+				__BLUE_LED_ON;
+			}
+			else if( runtimePars.activeFaults != 0 || runtimePars.chargingState == faultState ){	//if active faults found -> status LED = RED
 				__GREEN_LED_OFF;
 				__RED_LED_ON;
 			}

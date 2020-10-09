@@ -144,6 +144,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		nonVolPars.chgParas.balTempRatio = buffer_get_uint16(data, &ind);
 		nonVolPars.genParas.storageCellVoltage = buffer_get_uint16(data, &ind);
 		nonVolPars.genParas.timeToStorageDischarge = buffer_get_uint16(data, &ind);
+		nonVolPars.genParas.canActivityTick = data[ind++];
 		ind = 0;
 		send_buffer[ind++] = packet_id;
 		send_buffer[ind++] = CAN_ID;
@@ -183,6 +184,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		buffer_append_uint16(send_buffer, nonVolPars.chgParas.balTempRatio, &ind);
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.storageCellVoltage, &ind);
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.timeToStorageDischarge, &ind);
+		send_buffer[ind++] = nonVolPars.genParas.canActivityTick;
 		send_buffer[ind++] = CAN_ID;
 		commands_send_packet(send_buffer, ind);
 		break;

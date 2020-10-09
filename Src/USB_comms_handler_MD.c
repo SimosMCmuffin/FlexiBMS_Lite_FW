@@ -231,6 +231,9 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case timeToStorageDischarge:
 		nonVolPars.genParas.timeToStorageDischarge = (uint16_t)*value;
 		break;
+	case canActivityTick:
+		nonVolPars.genParas.canActivityTick = (uint8_t)*value;
+		break;
 	default:
 		report_error(error_invalidMessageID);
 		break;
@@ -690,6 +693,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendUint16(text, nonVolPars.genParas.timeToStorageDischarge, pos);
 		static const uint8_t description36[] = {" (h (Hours), how long to wait from last CHARGING event to start discharging the pack to the storage voltage, set to 0 to disable, Uint)\r\n"};
 		appendString(text, description36, pos);
+		break;
+	case canActivityTick:
+		appendUint16(text, nonVolPars.genParas.canActivityTick, pos);
+		static const uint8_t description37[] = {" (0/1, CAN activity status LED tick, good for testing that the BMS is receiving CAN traffic, Boolean)\r\n"};
+		appendString(text, description37, pos);
 		break;
 	default:;
 		static const uint8_t description33[] = {" (parameter error)\r\n"};

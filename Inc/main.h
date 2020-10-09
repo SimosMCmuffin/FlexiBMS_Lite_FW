@@ -163,6 +163,8 @@ typedef struct _generalParameters {
 
 	uint16_t storageCellVoltage;	//mV (milliVolts), what voltage to discharge cells if storage voltage discharge enabled
 	uint16_t timeToStorageDischarge;	//h (hours), how long to wait after active state to start discharging cells to storage voltage
+
+	uint8_t canActivityTick;	//1 or 0, ticks the status led in magenta when can packets are received
 } generalParameters;
 
 typedef struct _nonVolParameters {

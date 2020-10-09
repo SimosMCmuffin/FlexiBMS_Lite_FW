@@ -51,6 +51,7 @@ typedef enum
 	balTempRatio,
 	storageCellVoltage,
 	timeToStorageDischarge,
+	canActivityTick,
 
 	numberOfElements
 }_parameter_ID;
