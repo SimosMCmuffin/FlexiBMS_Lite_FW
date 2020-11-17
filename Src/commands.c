@@ -95,7 +95,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 
 		send_buffer[ind++] = 0;  // Future faultstate
 
-		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = nonVolPars.genParas.canID;
 		commands_send_packet(send_buffer, ind);
 
 		break;
@@ -108,7 +108,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 			buffer_append_int16(send_buffer, (int16_t) (LTC6803_getCellVoltage(i) * sign), &ind);
 		}
 
-		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = nonVolPars.genParas.canID;
 		commands_send_packet(send_buffer, ind);
 		break;
 	case COMM_SET_BMS_CONF:
@@ -147,7 +147,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		nonVolPars.genParas.canActivityTick = data[ind++];
 		ind = 0;
 		send_buffer[ind++] = packet_id;
-		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = nonVolPars.genParas.canID;
 		commands_send_packet(send_buffer, ind);
 		break;
 	case COMM_GET_BMS_CONF:
@@ -185,13 +185,13 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.storageCellVoltage, &ind);
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.timeToStorageDischarge, &ind);
 		send_buffer[ind++] = nonVolPars.genParas.canActivityTick;
-		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = nonVolPars.genParas.canID;
 		commands_send_packet(send_buffer, ind);
 		break;
 	case COMM_STORE_BMS_CONF:
 		saveNonVolatileParameters(&nonVolPars);
 		send_buffer[ind++] = packet_id;
-		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = nonVolPars.genParas.canID;
 		commands_send_packet(send_buffer, ind);
 		break;
 	default:

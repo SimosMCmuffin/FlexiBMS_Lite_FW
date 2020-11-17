@@ -234,6 +234,9 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case canActivityTick:
 		nonVolPars.genParas.canActivityTick = (uint8_t)*value;
 		break;
+	case canID:
+		nonVolPars.genParas.canID = (uint8_t)*value;
+		break;
 	default:
 		report_error(error_invalidMessageID);
 		break;
@@ -698,6 +701,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendUint16(text, nonVolPars.genParas.canActivityTick, pos);
 		static const uint8_t description37[] = {" (0/1, CAN activity status LED tick, good for testing that the BMS is receiving CAN traffic, Boolean)\r\n"};
 		appendString(text, description37, pos);
+		break;
+	case canID:
+		appendUint16(text, nonVolPars.genParas.canID, pos);
+		static const uint8_t description38[] = {" (CAN ID number for this BMS unit, if using multi-BMS setups, all BMS' need to have unique CAN ID, uint16_t)\r\n"};
+		appendString(text, description38, pos);
 		break;
 	default:;
 		static const uint8_t description33[] = {" (parameter error)\r\n"};

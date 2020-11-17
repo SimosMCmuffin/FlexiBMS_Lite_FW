@@ -13,13 +13,25 @@
 #include "config.h"
 #include "crc.h"
 #include "datatypes.h"
+#include <main.h>
 
 #define CAN_TRANSMIT_MAX_ATTEMPTS 100
 
 #define RX_BUFFER_SIZE 512
 static uint8_t rx_buffer[RX_BUFFER_SIZE];
 
+#define TX_BUFFER_SIZE 16
+struct txBuffer_struct{
+	uint32_t ID;
+	uint8_t data[8];
+	uint8_t len;
+};
+static struct txBuffer_struct txBuffer[TX_BUFFER_SIZE];
+static uint8_t queueIndex = 0, txIndex = 0;
+
 static unsigned int rx_buffer_last_id;
+
+extern nonVolParameters nonVolPars;
 
 void CAN1_init(){
 
@@ -107,10 +119,50 @@ uint8_t CAN1_attempt_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 
 uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 	for (uint8_t i = 0; i < CAN_TRANSMIT_MAX_ATTEMPTS; i++) {
-		if (CAN1_attempt_transmit(ID, data, length))
+		if (CAN1_enqueueTxBuffer(ID, data, length))
 			return 1;
 	}
 	return 0;
+}
+
+//used to send CAN-frames from TX buffer to TX mailbox
+uint8_t CAN1_sendTxBuffer(void){
+	//check that there's available frames waiting in the tx-buffer
+	if( queueIndex == txIndex )
+		return 0;
+
+	//attempt to enter a new CAN frame to the TX mailbox
+	if(	CAN1_attempt_transmit(	txBuffer[txIndex].ID,
+								txBuffer[txIndex].data,
+								txBuffer[txIndex].len) == 0){
+		return 0;
+	}
+
+	txIndex++;
+	//check that queueIndex stays in range
+	if( txIndex == TX_BUFFER_SIZE )
+		txIndex = 0;
+
+	return 1;
+}
+
+//used to put CAN-frames into a TX buffer
+uint8_t CAN1_enqueueTxBuffer(uint32_t ID, uint8_t * data, uint8_t length){
+	//first check that were not rolling over the queue index on unsent frames
+	if( ((queueIndex+1)%TX_BUFFER_SIZE) == txIndex )
+		return 0;
+
+	//insert data to the buffer
+	txBuffer[queueIndex].ID = ID;
+	memcpy(txBuffer[queueIndex].data, data, 8);
+	txBuffer[queueIndex].len = length;
+
+	queueIndex++;
+	//check that queueIndex stays in range
+	if( queueIndex == TX_BUFFER_SIZE )
+		queueIndex = 0;
+
+	return 1;
 }
 
 uint8_t CAN1_rxAvailable(){		//check if CAN RX packets available
@@ -196,7 +248,7 @@ void comm_can_send_buffer(uint8_t controller_id, uint8_t *data, unsigned int len
 
 	if (len <= 6) {
 		uint8_t ind = 0;
-		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = nonVolPars.genParas.canID;
 		send_buffer[ind++] = send;
 		memcpy(send_buffer + ind, data, len);
 		ind += len;
@@ -242,7 +294,7 @@ void comm_can_send_buffer(uint8_t controller_id, uint8_t *data, unsigned int len
 		}
 
 		uint32_t ind = 0;
-		send_buffer[ind++] = CAN_ID;
+		send_buffer[ind++] = nonVolPars.genParas.canID;
 		send_buffer[ind++] = send;
 		send_buffer[ind++] = len >> 8;
 		send_buffer[ind++] = len & 0xFF;
@@ -261,6 +313,8 @@ static void send_packet_wrapper(unsigned char *data, unsigned int len) {
 
 
 void CAN1_process_message() {
+	CAN1_sendTxBuffer();	//check if there is available CAN-frames in the tx-buffer and see if there are available TX mailboxes
+
 	if (!CAN1_rxAvailable())
 		return;
 
@@ -271,7 +325,7 @@ void CAN1_process_message() {
 	uint8_t controller_id = id & 0xFF;
 	CAN_PACKET_ID cmd = id >> 8;
 
-	if (controller_id != CAN_ID)
+	if (controller_id != nonVolPars.genParas.canID)
 		return;
 
 	int ind = 0;

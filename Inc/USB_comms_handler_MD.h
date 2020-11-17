@@ -52,6 +52,7 @@ typedef enum
 	storageCellVoltage,
 	timeToStorageDischarge,
 	canActivityTick,
+	canID,
 
 	numberOfElements
 }_parameter_ID;

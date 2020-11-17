@@ -165,6 +165,7 @@ typedef struct _generalParameters {
 	uint16_t timeToStorageDischarge;	//h (hours), how long to wait after active state to start discharging cells to storage voltage
 
 	uint8_t canActivityTick;	//1 or 0, ticks the status led in magenta when can packets are received
+	uint8_t canID;			//canID that the BMS uses to recognize as itself
 } generalParameters;
 
 typedef struct _nonVolParameters {

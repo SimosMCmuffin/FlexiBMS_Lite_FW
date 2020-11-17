@@ -4,11 +4,11 @@
 #define HW_NAME "FlexiBMSlite"
 
 #define FW_VERSION_MAJOR 0
-#define FW_VERSION_MINOR 10
+#define FW_VERSION_MINOR 11
 
 #define STM32_UUID_8 ((uint8_t*)0x1FFF7590)
 
-#define CAN_ID 10
+#define CAN_ID 10	//non-static ID used now
 
 #define MAX_CELLS 12
 

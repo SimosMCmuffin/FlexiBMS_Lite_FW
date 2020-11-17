@@ -61,6 +61,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 
 		nonVols->chgParas.refreshWaitTime = 30;
 		nonVols->genParas.canActivityTick = 0;
+		nonVols->genParas.canID = 10;
 
 	}
 
