@@ -50,12 +50,17 @@ void CAN1_init(){
 
 		CAN1->MCR |= (1 << 6) | (1 << 4) | (1 << 2);		//automatic bus-off management, *no automatic retransmission*, TX order by chronologically
 
+		CAN1->IER |= (1 << 0) | (1 << 1);		//enable TX interrupt, RX mailbox 0 interrupt
+
 		CAN1->BTR = 0;
 		CAN1->BTR |= (3 << 24) | (2 << 20) | (11 << 16) | (1 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock, 81%
 		CAN1->MCR &= ~(1 << 0);				//request to enter normal mode
 
 		CAN1->MCR &= ~(1 << 1);				//exit sleep mode
 		while( !!(CAN1->MSR & (1 << 1)) == 1 );			//wait for CAN1 to exit sleep mode
+
+		NVIC_EnableIRQ(CAN1_TX_IRQn);		//enable CAN1 TX interrupt
+		NVIC_EnableIRQ(CAN1_RX0_IRQn);		//enable CAN1 RX mailbox 0 interrupt
 
 		CAN_initialized = 1;		//mark CAN as initialized
 	}
@@ -79,8 +84,8 @@ void CAN1_deInit(){
 
 uint8_t CAN1_attempt_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 
-	if( !!(CAN1->TSR & (7 << 26)) && CAN_initialized == 1 ){		//Check that at least one TX mailbox is empty and that CAN is iniatilized
-		uint8_t TX_empty = (CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
+	if( !!(CAN1->TSR & (1 << 26)) && CAN_initialized == 1 ){		//Check that TX mailbox 0 is empty and that CAN is iniatilized
+		uint8_t TX_empty = 0;//(CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
 
 		CAN1->sTxMailBox[TX_empty].TIR = 0;
 		CAN1->sTxMailBox[TX_empty].TIR = (ID << 3) | (1 << 2);	//set CAN ID, extended frame
@@ -128,8 +133,10 @@ uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 //used to send CAN-frames from TX buffer to TX mailbox
 uint8_t CAN1_sendTxBuffer(void){
 	//check that there's available frames waiting in the tx-buffer
-	if( queueIndex == txIndex )
+	if( queueIndex == txIndex ){
+		CAN1->TSR |= (1 << 0);	//clear the TX empty flag, as there isn't anything to send at the moment. Otherwise gets stuck in the ISR.
 		return 0;
+	}
 
 	//attempt to enter a new CAN frame to the TX mailbox
 	if(	CAN1_attempt_transmit(	txBuffer[txIndex].ID,
@@ -162,6 +169,13 @@ uint8_t CAN1_enqueueTxBuffer(uint32_t ID, uint8_t * data, uint8_t length){
 	if( queueIndex == TX_BUFFER_SIZE )
 		queueIndex = 0;
 
+	//if all TX mailboxes are empty, then most likely the TX ISR is not running, prime it by putting the first frame into a mailbox from outside the ISR.
+	//Once the first mailbox empties it'll trigger the TX ISR where we can check if there are more waiting TX frames and send them all
+	//from the ISR, meanwhile we can queue more frames for it to send out on it's own
+	if( !!(CAN1->TSR & (7 << 26)) ){
+		CAN1_sendTxBuffer();
+	}
+
 	return 1;
 }
 
@@ -185,8 +199,10 @@ void CAN1_setupRxFilters(){
 	CAN1->FFA1R = 0;	//assing all filters for FIFO 0
 	CAN1->FA1R = 1;		//Filter 0 active
 
-	CAN1->sFilterRegister[0].FR1 = 0;	//ID 0
-	CAN1->sFilterRegister[0].FR2 = 0;	//set ALL mask bits to DO_NOT_CARE, meaning all messages will be read into RX FIFO
+	//CAN1->sFilterRegister[0].FR1 = 0;	//ID 0
+	CAN1->sFilterRegister[0].FR1 = 0 | (nonVolPars.genParas.canID << 3) | (1 << 2);	//ID [7:0] = canID and must use extended CAN ID
+	//CAN1->sFilterRegister[0].FR2 = 0;	//set ALL mask bits to DO_NOT_CARE, meaning all messages will be read into RX FIFO
+	CAN1->sFilterRegister[0].FR2 = 0 | (0xFF << 3) | (1 << 2);	//set mask bits as "care" for first 8 bits of extended ID and that the frame is using extended ID
 
 	CAN1->FMR = 0;		//filter active mode
 }
@@ -313,7 +329,7 @@ static void send_packet_wrapper(unsigned char *data, unsigned int len) {
 
 
 void CAN1_process_message() {
-	CAN1_sendTxBuffer();	//check if there is available CAN-frames in the tx-buffer and see if there are available TX mailboxes
+	//CAN1_sendTxBuffer();	//check if there is available CAN-frames in the tx-buffer and see if there are available TX mailboxes
 
 	if (!CAN1_rxAvailable())
 		return;
@@ -421,5 +437,24 @@ uint8_t CAN1_disableLoopBackMode(void){
 	}
 
 	return 1; 	//loop back mode disabled
+
+}
+
+//CAN1 TX ISR
+void CAN1_TX_IRQHandler(void){
+
+	if( !!(CAN1->TSR & (1 << 0)) == 1 ){	//TX mailbox 0 transmit request complete
+		CAN1_sendTxBuffer();
+	}
+
+}
+
+//CAN1 RX mailbox 0 ISR
+void CAN1_RX0_IRQHandler(void){
+
+	if( !!(CAN1->RF0R & (3 << 0)) == 1 ){	//RX mailbox 0 not empty
+
+		CAN1_process_message();
+	}
 
 }

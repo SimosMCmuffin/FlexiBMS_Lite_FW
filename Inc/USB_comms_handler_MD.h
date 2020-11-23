@@ -54,6 +54,8 @@ typedef enum
 	canActivityTick,
 	canID,
 
+	duringActive5vOn,
+
 	numberOfElements
 }_parameter_ID;
 

@@ -109,7 +109,8 @@ typedef enum
 	led5vRequest,
 	balancing5vRequest,
 	always5vRequest,
-	opto5vRequest
+	opto5vRequest,
+	active5vRequest
 }_5vRequest_ID;
 
 enum
@@ -160,6 +161,7 @@ typedef struct _generalParameters {
 	uint16_t stayActiveTime;	//h (Hours), how long to stay in active mode
 	uint8_t alwaysBalancing;	//1 or 0, allow balancing even when not charging
 	uint8_t always5vRequest;	//1 or 0, force 5V buck always on
+	uint8_t duringActive5vOn;	//1 or 0, whether to keep 5V regulator on during active time, even if USB, charger or Opto not active
 
 	uint16_t storageCellVoltage;	//mV (milliVolts), what voltage to discharge cells if storage voltage discharge enabled
 	uint16_t timeToStorageDischarge;	//h (hours), how long to wait after active state to start discharging cells to storage voltage

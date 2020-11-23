@@ -34,6 +34,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->genParas.stayActiveTime = 100;
 		nonVols->genParas.alwaysBalancing = 0;
 		nonVols->genParas.always5vRequest = 0;
+		nonVols->genParas.duringActive5vOn = 0;
 		nonVols->genParas.storageCellVoltage = 3800;
 		nonVols->genParas.timeToStorageDischarge = 0;
 
@@ -61,7 +62,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 
 		nonVols->chgParas.refreshWaitTime = 30;
 		nonVols->genParas.canActivityTick = 0;
-		nonVols->genParas.canID = 10;
+		nonVols->genParas.canID = CAN_ID;
 
 	}
 
@@ -595,9 +596,17 @@ void updateActiveTimer(void){
 	if( 	(runtimePars.activeTick + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS )) <= HAL_GetTick() &&
 			runtimePars.storageDischarged == 1 ){
 		runtimePars.activeTimerState = 0;	//active time window passed
+
+		if( nonVolPars.genParas.duringActive5vOn == 1 ){	//if duringActive5vOn enabled, clear 5V request
+			runtimePars.buck5vRequest &= ~(1 << active5vRequest);
+		}
 	}
 	else{
 		runtimePars.activeTimerState = 1;	//active time window not-passed
+
+		if( nonVolPars.genParas.duringActive5vOn == 1 ){	//if duringActive5vOn enabled, set 5V request
+			runtimePars.buck5vRequest |= (1 << active5vRequest);
+		}
 	}
 }
 
@@ -660,6 +669,41 @@ void jumpToBootloader(void){
 	asm("ldr sp, [r0, #0]");	//load SP with value that R0 points to	*0x1FFF 0000 (End of stack)
 	asm("ldr r0, [r0, #4]");	//load R0 with value R0 + 4 points to *0x1FFF 0004 (Reset Vector)
 	asm("bx r0");				//jump there
+}
+
+void restartFW(void){
+	//Stop and de-init USB stack
+	USBD_DeInit(&hUsbDeviceFS);
+	__disable_irq();
+
+	//de-init all peripherals
+	SysTick->CTRL = 4;	//reset systick to default state (no interrupt enabled)
+
+	RCC->AHB2RSTR = ~(0x00000000);		//Reset all peripherals in AHB2 bus
+	RCC->AHB2ENR = 0;				//disable all peripheral clocks in AHB2 bus
+	RCC->AHB2RSTR = 0;			//Clear reset all peripherals in AHB2 bus
+
+	RCC->APB1RSTR1 = ~(0x00000400);		//Reset all peripherals in APB1 bus, except RTC peripheral
+	RCC->APB1ENR1 = 0x00000400;			//disable all peripheral clocks in APB1 bus
+	RCC->APB1RSTR1 = 0;			//Clear reset all peripherals in APB1 bus
+
+	RCC->APB2RSTR = ~(0x00000000);		//Reset all peripherals in APB2 bus
+	RCC->APB2ENR = 0;			//disable all peripheral clocks in APB2 bus
+	RCC->APB2RSTR = 0;			//Clear reset all peripherals in APB2 bus
+
+	//check oscillator status, MSI as main clock @ 4 MHz and everything else off
+	//check if USB's 48 MHz internal oscillator on
+	if( (RCC->CRRCR & (1 << 0)) != 0 ){	//HSI48_ON bit
+		RCC->CRRCR = 0;					//disable
+	}
+	if( ((RCC->CR & (0xF << 4)) >> 4) != 6 ){	//check if MSI_range something else than 6 (4 MHz speed)
+		RCC->CR = (RCC->CR & ~(0xF << 4)) | (6 << 4);	//set MSI_range to 6 (4 MHz speed)
+	}
+
+	for(uint32_t x=0; x<1400000; x++);
+
+	SCB->AIRCR = (0x5FA << 16) | (1 << 2);	//request system reset from the System Control Block (SCB) in the M4-cortex core
+
 }
 
 void checkChargerVoltageFault(){

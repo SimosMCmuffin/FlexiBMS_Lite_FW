@@ -20,6 +20,7 @@ void hwRequestControl(void);
 void statusLed(void);
 void changeRunMode();
 void jumpToBootloader(void);
+void restartFW(void);
 
 void checkChargerVoltageFault(void);
 void checkBMStemperatureFault(void);

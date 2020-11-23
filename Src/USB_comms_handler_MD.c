@@ -16,6 +16,7 @@
 #define APP_RX_DATA_SIZE  64
 
 extern void jumpToBootloader(void);
+extern void restartFW(void);
 
 extern const uint8_t FW_VERSION[];
 extern nonVolParameters nonVolPars;
@@ -48,6 +49,9 @@ void USB_checkForNewMessages(){
 					break;
 				case 'B':
 					jumpToBootloader();
+					break;
+				case 'K':
+					restartFW();
 					break;
 				case 'W':
 					report_firmware();
@@ -237,6 +241,9 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case canID:
 		nonVolPars.genParas.canID = (uint8_t)*value;
 		break;
+	case duringActive5vOn:
+		nonVolPars.genParas.duringActive5vOn = (uint8_t)*value;
+		break;
 	default:
 		report_error(error_invalidMessageID);
 		break;
@@ -422,6 +429,7 @@ void report_help(){
 							"$H (print HW version)\r\n"
 							"$C (print board Unique ID)\r\n"
 							"$B (jump into bootloader)\r\n"
+							"$K (reboot FW)\r\n"
 							"$S (save parameters to EEPROM)\r\n"
 							"$L (load parameters from EEPROM)\r\n"
 							"$D (load default parameters)\r\n\r\n"
@@ -706,6 +714,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendUint16(text, nonVolPars.genParas.canID, pos);
 		static const uint8_t description38[] = {" (CAN ID number for this BMS unit, if using multi-BMS setups, all BMS' need to have unique CAN ID, uint16_t)\r\n"};
 		appendString(text, description38, pos);
+		break;
+	case duringActive5vOn:
+		appendUint16(text, nonVolPars.genParas.duringActive5vOn, pos);
+		static const uint8_t description39[] = {" (0/1, if set to 1, keeps 5V regulator on even if USB, charger or Opto not active, Boolean)\r\n"};
+		appendString(text, description39, pos);
 		break;
 	default:;
 		static const uint8_t description33[] = {" (parameter error)\r\n"};
