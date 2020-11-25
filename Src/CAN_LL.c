@@ -27,7 +27,7 @@ struct txBuffer_struct{
 	uint8_t len;
 };
 static struct txBuffer_struct txBuffer[TX_BUFFER_SIZE];
-static uint8_t queueIndex = 0, txIndex = 0;
+static uint8_t queueIndex = 0, txIndex = 0, ISR_running = 0;
 
 static unsigned int rx_buffer_last_id;
 
@@ -134,7 +134,8 @@ uint8_t CAN1_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 uint8_t CAN1_sendTxBuffer(void){
 	//check that there's available frames waiting in the tx-buffer
 	if( queueIndex == txIndex ){
-		CAN1->TSR |= (1 << 0);	//clear the TX empty flag, as there isn't anything to send at the moment. Otherwise gets stuck in the ISR.
+		CAN1->TSR |= (1 << 0);	//clear the TX mailbox 0 empty flag, as there isn't anything to send at the moment. Otherwise gets stuck in the ISR.
+		ISR_running = 0;
 		return 0;
 	}
 
@@ -144,6 +145,8 @@ uint8_t CAN1_sendTxBuffer(void){
 								txBuffer[txIndex].len) == 0){
 		return 0;
 	}
+	else
+		ISR_running = 1;
 
 	txIndex++;
 	//check that queueIndex stays in range
@@ -157,7 +160,7 @@ uint8_t CAN1_sendTxBuffer(void){
 uint8_t CAN1_enqueueTxBuffer(uint32_t ID, uint8_t * data, uint8_t length){
 	//first check that were not rolling over the queue index on unsent frames
 	if( ((queueIndex+1)%TX_BUFFER_SIZE) == txIndex )
-		return 0;
+		return 0;	//buffer full
 
 	//insert data to the buffer
 	txBuffer[queueIndex].ID = ID;
@@ -169,12 +172,14 @@ uint8_t CAN1_enqueueTxBuffer(uint32_t ID, uint8_t * data, uint8_t length){
 	if( queueIndex == TX_BUFFER_SIZE )
 		queueIndex = 0;
 
-	//if all TX mailboxes are empty, then most likely the TX ISR is not running, prime it by putting the first frame into a mailbox from outside the ISR.
+	//if TX mailbox 0 is empty, then most likely the TX ISR is not running, prime it by putting the first frame into a mailbox from outside the ISR.
 	//Once the first mailbox empties it'll trigger the TX ISR where we can check if there are more waiting TX frames and send them all
 	//from the ISR, meanwhile we can queue more frames for it to send out on it's own
-	if( !!(CAN1->TSR & (7 << 26)) ){
+	NVIC_DisableIRQ(CAN1_TX_IRQn);		//disable CAN1 TX interrupt
+	if( ISR_running == 0 ){
 		CAN1_sendTxBuffer();
 	}
+	NVIC_EnableIRQ(CAN1_TX_IRQn);		//enable CAN1 TX interrupt
 
 	return 1;
 }
