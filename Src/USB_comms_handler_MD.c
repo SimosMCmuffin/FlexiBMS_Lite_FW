@@ -244,6 +244,9 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case duringActive5vOn:
 		nonVolPars.genParas.duringActive5vOn = (uint8_t)*value;
 		break;
+	case canRxRefreshActive:
+		nonVolPars.genParas.canRxRefreshActive = (uint16_t)*value;
+		break;
 	default:
 		report_error(error_invalidMessageID);
 		break;
@@ -719,6 +722,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		appendUint16(text, nonVolPars.genParas.duringActive5vOn, pos);
 		static const uint8_t description39[] = {" (0/1, if set to 1, keeps 5V regulator on even if USB, charger or Opto not active, Boolean)\r\n"};
 		appendString(text, description39, pos);
+		break;
+	case canRxRefreshActive:
+		appendUint16(text, nonVolPars.genParas.canRxRefreshActive, pos);
+		static const uint8_t description40[] = {" (h (Hours), up to how many hours a CAN-frame reception can extend activeTimer, set to 0 to disable, uint16_t)\r\n"};
+		appendString(text, description40, pos);
 		break;
 	default:;
 		static const uint8_t description33[] = {" (parameter error)\r\n"};

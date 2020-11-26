@@ -48,7 +48,7 @@ int main(void)
 	trimOscillator();
 
 	uint64_t systemTick = HAL_GetTick(), LTC6803tick = HAL_GetTick();
-	runtimePars.activeTick =  HAL_GetTick() + 5000;
+	runtimePars.activeTick =  HAL_GetTick() + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS ) + 5000;
 
 
 	while (1)
