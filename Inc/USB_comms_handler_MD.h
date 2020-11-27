@@ -55,6 +55,7 @@ typedef enum
 	canID,
 
 	duringActive5vOn,
+	canRxRefreshActive,
 
 	numberOfElements
 }_parameter_ID;

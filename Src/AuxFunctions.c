@@ -63,6 +63,7 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->chgParas.refreshWaitTime = 30;
 		nonVols->genParas.canActivityTick = 0;
 		nonVols->genParas.canID = CAN_ID;
+		nonVols->genParas.canRxRefreshActive = 0;
 
 	}
 
@@ -94,8 +95,8 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 	runtimePars->storageDischarged = 1;
 	runtimePars->storageTimerState = 1;
 
-	runtimePars->activeTick = HAL_GetTick();
-	runtimePars->storageTick = HAL_GetTick();
+	runtimePars->activeTick = HAL_GetTick() + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS ) ;
+	runtimePars->storageTick = HAL_GetTick() + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS );
 }
 
 uint8_t countCells(void){			//Count how many cells are above
@@ -175,7 +176,7 @@ void chargeControl(void){
 			chargeTick = HAL_GetTick() + 250;
 		}
 	}
-	else{
+	else if( runtimePars.chargerConnected == 0 && runtimePars.chargingState != charging ){
 		runtimePars.chargingState = notCharging;
 		runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 	}
@@ -590,11 +591,10 @@ void updateActiveTimer(void){
 
 	if( 	runtimePars.usbConnected == 1 || runtimePars.charging == 1 || runtimePars.balancing == 1 ||
 			runtimePars.optoActive == 1 || runtimePars.chargerConnected == 1 ){
-		runtimePars.activeTick = HAL_GetTick() + 500;
+		runtimePars.activeTick = HAL_GetTick() + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS ) + 500;
 	}
 
-	if( 	(runtimePars.activeTick + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS )) <= HAL_GetTick() &&
-			runtimePars.storageDischarged == 1 ){
+	if( runtimePars.activeTick <= HAL_GetTick() && runtimePars.storageDischarged == 1 ){
 		runtimePars.activeTimerState = 0;	//active time window passed
 
 		if( nonVolPars.genParas.duringActive5vOn == 1 ){	//if duringActive5vOn enabled, clear 5V request
@@ -613,11 +613,10 @@ void updateActiveTimer(void){
 void updateStorageTimer(void){
 
 	if( runtimePars.chargerConnected == 1 ){
-		runtimePars.storageTick = HAL_GetTick();
+		runtimePars.storageTick = HAL_GetTick() + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS );
 	}
 
-	if( 	((runtimePars.storageTick + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS )) <= HAL_GetTick()) &&
-			nonVolPars.genParas.timeToStorageDischarge != 0 ){
+	if( runtimePars.storageTick <= HAL_GetTick() && nonVolPars.genParas.timeToStorageDischarge != 0 ){
 		if( runtimePars.storageTimerState == 1 ){
 		runtimePars.storageTimerState = 0;	//storage time window passed
 		runtimePars.storageDischarged = 0;	//clear storageDischarge state when starting storagedischarging

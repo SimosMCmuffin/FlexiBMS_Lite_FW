@@ -32,6 +32,7 @@ static uint8_t queueIndex = 0, txIndex = 0, ISR_running = 0;
 static unsigned int rx_buffer_last_id;
 
 extern nonVolParameters nonVolPars;
+extern runtimeParameters runtimePars;
 
 void CAN1_init(){
 
@@ -69,9 +70,9 @@ void CAN1_init(){
 
 void CAN1_deInit(){
 
-	if( CAN_initialized == 1){			//check that CAN is initialized
+	if( CAN_initialized == 1 ){			//check that CAN is initialized
 		CAN1->MCR |= (1 << 1);		//request to enter sleep mode
-		while( !!(CAN1->MSR & (1 << 1)) == 0 );		//wait for bus activity to finish/stop and enter sleep mode
+		while( !!(CAN1->MSR & (1 << 1)) == 0 || ISR_running == 1 );		//wait for bus activity to finish/stop and enter sleep mode
 		RCC->APB1ENR1 &= ~(1 << 25);			//Disable CAN1 bus clock
 
 		GPIOB->MODER &= ~( (3 << 16) | (3 << 18) );			//Configure pins PB8 and PB9 to analog state for low-power usage
@@ -460,6 +461,13 @@ void CAN1_RX0_IRQHandler(void){
 	if( !!(CAN1->RF0R & (3 << 0)) == 1 ){	//RX mailbox 0 not empty
 
 		CAN1_process_message();
+
+		//CAN RX activeTimer refresh
+		if( nonVolPars.genParas.canRxRefreshActive != 0 ){	//check if parameter is enabled, before going into a bigger if-statement
+			if( (runtimePars.activeTick - (nonVolPars.genParas.canRxRefreshActive * __TIME_HOUR_TICKS)) <= HAL_GetTick() ){
+				runtimePars.activeTick = HAL_GetTick() + (nonVolPars.genParas.canRxRefreshActive * __TIME_HOUR_TICKS);
+			}
+		}
 	}
 
 }
