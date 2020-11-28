@@ -720,7 +720,7 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		break;
 	case duringActive5vOn:
 		appendUint16(text, nonVolPars.genParas.duringActive5vOn, pos);
-		static const uint8_t description39[] = {" (0/1, if set to 1, keeps 5V regulator on even if USB, charger or Opto not active, Boolean)\r\n"};
+		static const uint8_t description39[] = {" (0/1, if set to 1, keeps 5V regulator on if activeTimer is not expired even if USB, charger or Opto not active, Boolean)\r\n"};
 		appendString(text, description39, pos);
 		break;
 	case canRxRefreshActive:

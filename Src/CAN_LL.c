@@ -54,7 +54,7 @@ void CAN1_init(){
 		CAN1->IER |= (1 << 0) | (1 << 1);		//enable TX interrupt, RX mailbox 0 interrupt
 
 		CAN1->BTR = 0;
-		CAN1->BTR |= (3 << 24) | (2 << 20) | (11 << 16) | (1 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock, 81%
+		CAN1->BTR |= (3 << 24) | (2 << 20) | (11 << 16) | (1 << 0);		//Set timings for 500kHz CAN baud with 16MHz source clock, 75%
 		CAN1->MCR &= ~(1 << 0);				//request to enter normal mode
 
 		CAN1->MCR &= ~(1 << 1);				//exit sleep mode
