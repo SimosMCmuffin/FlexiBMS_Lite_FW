@@ -29,8 +29,6 @@ struct txBuffer_struct{
 static struct txBuffer_struct txBuffer[TX_BUFFER_SIZE];
 static uint8_t queueIndex = 0, txIndex = 0, ISR_running = 0;
 
-static unsigned int rx_buffer_last_id;
-
 extern nonVolParameters nonVolPars;
 extern runtimeParameters runtimePars;
 
@@ -329,8 +327,8 @@ void comm_can_send_buffer(uint8_t controller_id, uint8_t *data, unsigned int len
 	}
 }
 
-static void send_packet_wrapper(unsigned char *data, unsigned int len) {
-	comm_can_send_buffer(rx_buffer_last_id, data, len, 1);
+static void send_packet_wrapper(uint8_t to, uint8_t *data, unsigned int len) {
+	comm_can_send_buffer(to, data, len, 1);
 }
 
 
@@ -351,12 +349,13 @@ void CAN1_process_message() {
 		return;
 
 	int ind = 0;
+	uint8_t from = 0;
 	uint8_t* packet_data = NULL;
 	unsigned int packet_length = 0;
 	uint8_t commands_send = 0;
 	switch (cmd) {
 	case CAN_PACKET_PROCESS_SHORT_BUFFER:
-		rx_buffer_last_id = data[ind++];
+		from = data[ind++];
 		commands_send = data[ind++];
 		packet_data = data + ind;
 		packet_length = length - ind;
@@ -374,7 +373,7 @@ void CAN1_process_message() {
 		}
 		return;
 	case CAN_PACKET_PROCESS_RX_BUFFER:
-		rx_buffer_last_id = data[ind++];
+		from = data[ind++];
 		commands_send = data[ind++];
 		unsigned int rxbuf_len = (unsigned int)data[ind++] << 8;
 		rxbuf_len |= (unsigned int)data[ind++];
@@ -397,7 +396,7 @@ void CAN1_process_message() {
 	}
 
 	if (commands_send == 0) {
-		commands_process_packet(packet_data, packet_length, send_packet_wrapper);
+		commands_process_packet(from, packet_data, packet_length, send_packet_wrapper);
 	}
 	// Nothing to do for commands_send==1 (forward) and commands_send==2 (process without responding) for now.
 }
