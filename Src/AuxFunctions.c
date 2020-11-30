@@ -22,7 +22,8 @@ extern runtimeParameters runtimePars;
 
 void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 
-	if( loadNonVolatileParameters(nonVols) == 0 || loadDefaults == 1){	//if no parameters stored in FLASH, load defaults
+	//if no parameters stored in FLASH or if they were stored with different version number, load defaults
+	if( loadNonVolatileParameters(nonVols) == 0 || loadDefaults == 1 || nonVols->FW_version != ((FW_VERSION_MAJOR << 8) | FW_VERSION_MINOR) ){
 
 		for(uint8_t x=0; x<5; x++){
 			nonVols->adcParas.ADC_chan_gain[x] = 1.0;
@@ -64,6 +65,8 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->genParas.canActivityTick = 0;
 		nonVols->genParas.canID = CAN_ID;
 		nonVols->genParas.canRxRefreshActive = 0;
+
+		nonVols->FW_version = (FW_VERSION_MAJOR << 8) | FW_VERSION_MINOR;
 
 	}
 
@@ -154,7 +157,8 @@ uint8_t usbPowerPresent(void){		//Start and stop USB service depending on if 5V 
  * @brief  chargeControl : used to switch and monitor the charging
  */
 void chargeControl(void){
-	static uint64_t chargeTick = 0;
+	static uint64_t chargeTick = 0, auxTick = 0;
+	static uint16_t OCevent = 0;
 
 	//check if charger detected
 	if( runtimePars.chargerConnected == 1 ){
@@ -176,13 +180,13 @@ void chargeControl(void){
 			chargeTick = HAL_GetTick() + 250;
 		}
 	}
-	else if( runtimePars.chargerConnected == 0 && runtimePars.chargingState != charging ){
+	else if( runtimePars.chargerConnected == 0 && runtimePars.chargingState != charging && runtimePars.chargingState != startingCurrent ){
 		runtimePars.chargingState = notCharging;
 		runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 	}
 
 	if( runtimePars.chargingState != notCharging && runtimePars.chargingState != faultState && runtimePars.activeFaults != 0 ){
-							//if faults found, set state machine to fault wait state
+		//if faults found, set state machine to fault wait state
 		runtimePars.chargingState = faultState;
 		chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
 	}
@@ -221,12 +225,44 @@ void chargeControl(void){
 			}
 			else{
 				chargeTick = HAL_GetTick() + 300;
+				auxTick = HAL_GetTick();
+
 				__ENABLE_CHG;
 				runtimePars.charging = 1;
 
-				runtimePars.chargingState = charging;
+				OCevent = 0;
+				runtimePars.chargingState = startingCurrent;
 			}
 
+		}
+		break;
+
+	case startingCurrent:
+		//monitor the current, allow max 250ms of overcurrent period and stop charging if the current isn't above the termination current limit in 500ms at the end
+		if( (auxTick + 1) <= HAL_GetTick() ){	//check roughly every 1 ms
+			auxTick++;
+
+
+			if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.maxChgCurr ){	//check for overcurrent event
+				OCevent++;
+			}
+
+			if( OCevent > 35 ){	//if overcurrent event has been happening long enough (35ms), terminate charge
+				runtimePars.activeFaults |= ((uint64_t)1 << fault_highChargingCurrent);
+				runtimePars.chargingState = chargingEnd;
+				__DISABLE_CHG;
+				break;
+			}
+
+
+			if( chargeTick <= HAL_GetTick() ){	//if at the end of the starting period the current is below the termination current, go to end-of-charge
+				if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.termCurr ){
+					runtimePars.chargingState = charging;
+				}
+				else{
+					runtimePars.chargingState = chargingEnd;
+				}
+			}
 		}
 		break;
 

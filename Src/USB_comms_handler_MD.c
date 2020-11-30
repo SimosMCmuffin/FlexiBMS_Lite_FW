@@ -747,6 +747,10 @@ void appendChargingState(uint8_t* text, uint16_t state, uint16_t* pos){
 		static const uint8_t description1[] = {"chargingStarting:"};
 		appendString(text, description1, pos);
 		break;
+	case startingCurrent:;
+		static const uint8_t description6[] = {"startingCurrent:"};
+		appendString(text, description6, pos);
+		break;
 	case charging:;
 		static const uint8_t description2[] = {"charging:"};
 		appendString(text, description2, pos);

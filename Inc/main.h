@@ -117,6 +117,7 @@ enum
 {
 	notCharging = 0,
 	chargingStarting,
+	startingCurrent,
 	charging,
 	chargingEnd,
 	chargerDisconnected,
@@ -172,6 +173,7 @@ typedef struct _generalParameters {
 } generalParameters;
 
 typedef struct _nonVolParameters {
+	uint16_t FW_version;
 	chargingParameters chgParas;
 	ADCparameters adcParas;
 	generalParameters genParas;
