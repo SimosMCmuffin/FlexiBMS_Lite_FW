@@ -15,22 +15,22 @@
 extern runtimeParameters runtimePars;
 extern nonVolParameters nonVolPars;
 
-static void(* volatile send_func)(unsigned char *data, unsigned int len) = 0;
+static void(* volatile send_func)(uint8_t to, uint8_t *data, unsigned int len) = 0;
 
 /**
  * Send a packet using the set send function.
  */
-void commands_send_packet(unsigned char *data, unsigned int len) {
+void commands_send_packet(uint8_t to, uint8_t *data, unsigned int len) {
 	if (send_func) {
-		send_func(data, len);
+		send_func(to, data, len);
 	}
 }
 
 /**
  * Process a received buffer with commands and data.
  */
-void commands_process_packet(unsigned char *data, unsigned int len,
-		void(*reply_func)(unsigned char *data, unsigned int len)) {
+void commands_process_packet(uint8_t from, uint8_t *data, unsigned int len,
+		void(*reply_func)(uint8_t to, uint8_t *data, unsigned int len)) {
 
 	if (!len) {
 		return;
@@ -55,7 +55,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		memcpy(send_buffer + ind, STM32_UUID_8, 12);
 		ind += 12;
 
-		commands_send_packet(send_buffer, ind);
+		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_GET_VALUES:
 		send_buffer[ind++] = COMM_GET_VALUES;
@@ -96,7 +96,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		send_buffer[ind++] = 0;  // Future faultstate
 
 		send_buffer[ind++] = nonVolPars.genParas.canID;
-		commands_send_packet(send_buffer, ind);
+		commands_send_packet(from, send_buffer, ind);
 
 		break;
 	case COMM_GET_BMS_CELLS:
@@ -109,7 +109,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		}
 
 		send_buffer[ind++] = nonVolPars.genParas.canID;
-		commands_send_packet(send_buffer, ind);
+		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_SET_BMS_CONF:
 		nonVolPars.chgParas.packCellCount = buffer_get_uint16(data, &ind);
@@ -151,7 +151,7 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		ind = 0;
 		send_buffer[ind++] = packet_id;
 		send_buffer[ind++] = nonVolPars.genParas.canID;
-		commands_send_packet(send_buffer, ind);
+		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_GET_BMS_CONF:
 		send_buffer[ind++] = packet_id;
@@ -191,13 +191,13 @@ void commands_process_packet(unsigned char *data, unsigned int len,
 		send_buffer[ind++] = nonVolPars.genParas.canID;
 		send_buffer[ind++] = nonVolPars.genParas.duringActive5vOn;
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.canRxRefreshActive, &ind);
-		commands_send_packet(send_buffer, ind);
+		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_STORE_BMS_CONF:
 		saveNonVolatileParameters(&nonVolPars);
 		send_buffer[ind++] = packet_id;
 		send_buffer[ind++] = nonVolPars.genParas.canID;
-		commands_send_packet(send_buffer, ind);
+		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_REBOOT:
 		restartFW();
