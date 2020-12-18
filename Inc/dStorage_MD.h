@@ -12,8 +12,8 @@
 
 #include "main.h"
 
-uint8_t loadNonVolatileParameters(nonVolParameters*);
+uint8_t readNonVolatileParameters(uint8_t*, uint16_t);
 
-uint8_t saveNonVolatileParameters(nonVolParameters*);
+uint8_t storeNonVolatileParameters(uint8_t*, uint16_t);
 
 #endif /* DSTORAGE_MD_H_ */

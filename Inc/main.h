@@ -124,7 +124,7 @@ enum
 	faultState
 }_chargingState_ID;
 
-typedef struct _chargingParameters {
+typedef struct __attribute__((packed)) _chargingParameters {
 	uint16_t packCellCount;	//# number of series cells in the battery pack
 	uint16_t maxChgCurr;	//mA (milliAmps), maximum current allowed to flow to battery
 	uint16_t termCurr;		//mA (milliAmps), stop charging when current drops below this
@@ -151,14 +151,14 @@ typedef struct _chargingParameters {
 	uint16_t refreshWaitTime;	//s (seconds), wait time
 } chargingParameters;
 
-typedef struct _ADCparameters {
+typedef struct __attribute__((packed)) _ADCparameters {
 	float ADC_chan_gain[5];		//gain adjustments for ADC_channels
 	float ADC_chan_offset[5];	//offset adjustments ADC_channels
 	uint16_t extNTCbetaValue;	//external NTC sensors beta value
 	uint16_t AdcOversampling;	//oversampling setting for ADC
 } ADCparameters;
 
-typedef struct _generalParameters {
+typedef struct __attribute__((packed)) _generalParameters {
 	uint16_t stayActiveTime;	//h (Hours), how long to stay in active mode
 	uint8_t alwaysBalancing;	//1 or 0, allow balancing even when not charging
 	uint8_t always5vRequest;	//1 or 0, force 5V buck always on
@@ -172,7 +172,7 @@ typedef struct _generalParameters {
 	uint16_t canRxRefreshActive;	//h (hours),Receiving CAN messages refresh activeTimer up to this length, 0 to disable
 } generalParameters;
 
-typedef struct _nonVolParameters {
+typedef struct __attribute__((packed)) _nonVolParameters {
 	uint16_t FW_version;
 	chargingParameters chgParas;
 	ADCparameters adcParas;
@@ -211,7 +211,7 @@ typedef struct _runtimeParameters {
 } runtimeParameters;
 
 void Error_Handler(void);
-extern void initNonVolatiles(nonVolParameters*, uint8_t);
+extern uint8_t initNonVolatiles(nonVolParameters*, uint8_t);
 extern void initRuntimeParameters(runtimeParameters*);
 
 #ifdef __cplusplus

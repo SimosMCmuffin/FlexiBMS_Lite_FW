@@ -8,6 +8,7 @@
 #ifndef AUXFUNCTIONS_H_
 #define AUXFUNCTIONS_H_
 
+#include <main.h>
 
 uint8_t countCells(void);
 uint16_t highestCell(uint8_t);
@@ -30,6 +31,9 @@ void checkPackVoltageFault(void);
 uint8_t checkMaxCurrentFault(void);
 
 uint8_t getHWversion(void);
+void saveNonVolatileParameters(nonVolParameters*);
+void packNonVolatileParameters(nonVolParameters*, uint8_t*, int32_t*);
+void unpackNonVolatileParameters(nonVolParameters*, uint8_t*);
 
 void updateActiveTimer(void);
 void updateStorageTimer(void);

@@ -11,6 +11,7 @@
 #include <ADC_LL.h>
 #include <LTC6803_3_DD.h>
 #include <config.h>
+#include <AuxFunctions.h>
 
 
 #define APP_RX_DATA_SIZE  64
@@ -67,7 +68,7 @@ void USB_checkForNewMessages(){
 					report_save(0);
 					break;
 				case 'L':
-					report_load( loadNonVolatileParameters(&nonVolPars) );
+					report_load( initNonVolatiles(&nonVolPars, 0) );
 					break;
 				case 'D':
 					report_loadDefaults();

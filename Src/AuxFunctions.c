@@ -15,16 +15,73 @@
 #include "config.h"
 #include <CAN_LL.h>
 #include <SPI_LL.h>
+#include <buffer.h>
 
 extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 extern nonVolParameters nonVolPars;
 extern runtimeParameters runtimePars;
 
-void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
+uint8_t initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
+	uint8_t packedData[__FLASH_NON_VOL_SIZE];
 
-	//if no parameters stored in FLASH or if they were stored with different version number, load defaults
-	if( loadNonVolatileParameters(nonVols) == 0 || loadDefaults == 1 || nonVols->FW_version != ((FW_VERSION_MAJOR << 8) | FW_VERSION_MINOR) ){
+	if( readNonVolatileParameters(packedData, sizeof(nonVolParameters)) == 1 && loadDefaults == 0 ){	//check if saved data found
+		//unpack data
+		unpackNonVolatileParameters(nonVols, packedData);
 
+		//check FW_version with what the parameters were saved with and init only the necessary parameters to default values
+		switch(nonVols->FW_version){
+			default:	//parameters saved with too old FW_version, init to default value all parameters
+				for(uint8_t x=0; x<5; x++){
+					nonVols->adcParas.ADC_chan_gain[x] = 1.0;
+					nonVols->adcParas.ADC_chan_offset[x] = 0;
+				}
+				nonVols->adcParas.extNTCbetaValue = 3380;
+				nonVols->adcParas.AdcOversampling = 16;
+
+				nonVols->genParas.stayActiveTime = 100;
+				nonVols->genParas.alwaysBalancing = 0;
+				nonVols->genParas.always5vRequest = 0;
+				nonVols->genParas.duringActive5vOn = 0;
+				nonVols->genParas.storageCellVoltage = 3800;
+				nonVols->genParas.timeToStorageDischarge = 0;
+
+				nonVols->chgParas.packCellCount = 12;
+				nonVols->chgParas.cellBalVolt = 4150;
+				nonVols->chgParas.cellDiffVolt = 10;
+				nonVols->chgParas.termCellVolt = 4180;
+				nonVols->chgParas.termPackVolt = 50400;
+				nonVols->chgParas.maxChgCurr = 6500;
+				nonVols->chgParas.termCurr = 300;
+				nonVols->chgParas.balTempRatio = 3;
+
+				nonVols->chgParas.minCellVolt = 2000;
+				nonVols->chgParas.maxCellVolt = 4250;
+				nonVols->chgParas.minChgVolt= 10000;
+				nonVols->chgParas.maxChgVolt = 55000;
+				nonVols->chgParas.minPackVolt= 7000;
+				nonVols->chgParas.maxPackVolt= 52000;
+
+				nonVols->chgParas.maxBMStemp = 330;
+				nonVols->chgParas.minBMStemp = 260;
+
+				nonVols->chgParas.maxNTCtemp = 0;
+				nonVols->chgParas.minNTCtemp = 0;
+
+				nonVols->chgParas.refreshWaitTime = 30;
+				nonVols->genParas.canActivityTick = 0;
+				nonVols->genParas.canID = CAN_ID;
+				nonVols->genParas.canRxRefreshActive = 0;
+
+			case ((0 << 8) | 16 ):	//0.16
+
+			break;
+		}
+
+		nonVols->FW_version = (FW_VERSION_MAJOR << 8) | FW_VERSION_MINOR;	//set the FW_version to the current one
+		return 1;
+	}
+	else{
+		//Nothing found stored in the flash or load defaults commanded, init to default values
 		for(uint8_t x=0; x<5; x++){
 			nonVols->adcParas.ADC_chan_gain[x] = 1.0;
 			nonVols->adcParas.ADC_chan_offset[x] = 0;
@@ -68,9 +125,12 @@ void initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 
 		nonVols->FW_version = (FW_VERSION_MAJOR << 8) | FW_VERSION_MINOR;
 
+		return 0;
 	}
 
+	return 0;
 }
+
 
 void initRuntimeParameters(runtimeParameters* runtimePars){
 	runtimePars->statePrintout = 0;
@@ -101,6 +161,114 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 	runtimePars->activeTick = HAL_GetTick() + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS ) ;
 	runtimePars->storageTick = HAL_GetTick() + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS );
 }
+
+void saveNonVolatileParameters(nonVolParameters* nonVols){
+	//pack the non-volatile data in a specific order into the struct
+	uint8_t packedData[__FLASH_NON_VOL_SIZE];
+	int32_t ind = 0;
+
+	packNonVolatileParameters(nonVols, packedData, &ind);
+
+	storeNonVolatileParameters(packedData, ind);
+
+}
+
+void unpackNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray){
+	int32_t ind = 0;
+
+	nonVols->FW_version = buffer_get_uint16(dataArray, &ind);	//Important
+	nonVols->genParas.canID = dataArray[ind++];				//Important
+
+	nonVols->chgParas.packCellCount = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.maxChgCurr = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.termCurr = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.minCellVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.maxCellVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.minChgVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.maxChgVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.minPackVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.maxPackVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.termCellVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.termPackVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.cellBalVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.cellDiffVolt = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.balTempRatio = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.minNTCtemp = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.maxNTCtemp = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.minBMStemp = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.maxBMStemp = buffer_get_uint16(dataArray, &ind);
+	nonVols->chgParas.refreshWaitTime = buffer_get_uint16(dataArray, &ind);
+
+	nonVols->adcParas.ADC_chan_gain[0] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_gain[1] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_gain[2] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_gain[3] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_gain[4] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_offset[0] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_offset[1] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_offset[2] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_offset[3] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.ADC_chan_offset[4] = buffer_get_float32_auto(dataArray, &ind);
+	nonVols->adcParas.extNTCbetaValue = buffer_get_uint16(dataArray, &ind);
+	nonVols->adcParas.AdcOversampling = buffer_get_uint16(dataArray, &ind);
+
+	nonVols->genParas.stayActiveTime = buffer_get_uint16(dataArray, &ind);
+	nonVols->genParas.alwaysBalancing = dataArray[ind++];
+	nonVols->genParas.always5vRequest = dataArray[ind++];
+	nonVols->genParas.duringActive5vOn = dataArray[ind++];
+	nonVols->genParas.storageCellVoltage = buffer_get_uint16(dataArray, &ind);
+	nonVols->genParas.timeToStorageDischarge = buffer_get_uint16(dataArray, &ind);
+	nonVols->genParas.canActivityTick = dataArray[ind++];
+	nonVols->genParas.canRxRefreshActive = buffer_get_uint16(dataArray, &ind);
+}
+
+void packNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray, int32_t* ind){
+	buffer_append_uint16(dataArray, nonVols->FW_version, ind);	//Important
+	dataArray[*ind++] = nonVols->genParas.canID;					//Important
+
+	buffer_append_uint16(dataArray, nonVols->chgParas.packCellCount, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.maxChgCurr, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.termCurr, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.minCellVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.maxCellVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.minChgVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.maxChgVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.minPackVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.maxPackVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.termCellVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.termPackVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.cellBalVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.cellDiffVolt, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.balTempRatio, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.minNTCtemp, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.maxNTCtemp, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.minBMStemp, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.maxBMStemp, ind);
+	buffer_append_uint16(dataArray, nonVols->chgParas.refreshWaitTime, ind);
+
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_gain[0], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_gain[1], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_gain[2], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_gain[3], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_gain[4], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_offset[0], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_offset[1], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_offset[2], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_offset[3], ind);
+	buffer_append_float32_auto(dataArray, nonVols->adcParas.ADC_chan_offset[4], ind);
+	buffer_append_uint16(dataArray, nonVols->adcParas.extNTCbetaValue, ind);
+	buffer_append_uint16(dataArray, nonVols->adcParas.AdcOversampling, ind);
+
+	buffer_append_uint16(dataArray, nonVols->genParas.stayActiveTime, ind);
+	dataArray[*ind++] = nonVols->genParas.alwaysBalancing;
+	dataArray[*ind++] = nonVols->genParas.always5vRequest;
+	dataArray[*ind++] = nonVols->genParas.duringActive5vOn;
+	buffer_append_uint16(dataArray, nonVols->genParas.storageCellVoltage, ind);
+	buffer_append_uint16(dataArray, nonVols->genParas.timeToStorageDischarge, ind);
+	dataArray[*ind++] = nonVols->genParas.canActivityTick;
+	buffer_append_uint16(dataArray, nonVols->genParas.canRxRefreshActive, ind);
+}
+
 
 uint8_t countCells(void){			//Count how many cells are above
 	uint8_t cellCount = 0;
