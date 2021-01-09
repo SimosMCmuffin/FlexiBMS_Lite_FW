@@ -194,13 +194,16 @@ void commands_process_packet(uint8_t from, uint8_t *data, unsigned int len,
 		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_STORE_BMS_CONF:
-		saveNonVolatileParameters(&nonVolPars);
+		saveNonVolatileParameters(&nonVolPars, 1);
 		send_buffer[ind++] = packet_id;
 		send_buffer[ind++] = nonVolPars.genParas.canID;
 		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_REBOOT:
 		restartFW();
+		break;
+	case COMM_JUMP_TO_BOOTLOADER:
+		jumpToCustomBootloader();
 		break;
 	default:
 		break;

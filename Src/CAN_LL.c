@@ -459,6 +459,12 @@ void CAN1_RX0_IRQHandler(void){
 
 	if( !!(CAN1->RF0R & (3 << 0)) == 1 ){	//RX mailbox 0 not empty
 
+		if( nonVolPars.genParas.canActivityTick == 1 ){	//CAN activity cyan flick
+			__GREEN_LED_ON;
+			__RED_LED_OFF;
+			__BLUE_LED_ON;
+		}
+
 		CAN1_process_message();
 
 		//CAN RX activeTimer refresh
@@ -467,6 +473,7 @@ void CAN1_RX0_IRQHandler(void){
 				runtimePars.activeTick = HAL_GetTick() + (nonVolPars.genParas.canRxRefreshActive * __TIME_HOUR_TICKS);
 			}
 		}
+
 	}
 
 }

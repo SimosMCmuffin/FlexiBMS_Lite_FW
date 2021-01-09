@@ -16,7 +16,7 @@
 
 #define APP_RX_DATA_SIZE  64
 
-extern void jumpToBootloader(void);
+extern void jumpToStmBootloader(void);
 extern void restartFW(void);
 
 extern const uint8_t FW_VERSION[];
@@ -49,7 +49,10 @@ void USB_checkForNewMessages(){
 					report_faults();
 					break;
 				case 'B':
-					jumpToBootloader();
+					jumpToStmBootloader();
+					break;
+				case 'N':
+					jumpToCustomBootloader();
 					break;
 				case 'K':
 					restartFW();
@@ -64,7 +67,7 @@ void USB_checkForNewMessages(){
 					report_UID();
 					break;
 				case 'S':
-					saveNonVolatileParameters(&nonVolPars);
+					saveNonVolatileParameters(&nonVolPars, 1);
 					report_save(0);
 					break;
 				case 'L':

@@ -162,14 +162,24 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 	runtimePars->storageTick = HAL_GetTick() + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS );
 }
 
-void saveNonVolatileParameters(nonVolParameters* nonVols){
-	//pack the non-volatile data in a specific order into the struct
-	uint8_t packedData[__FLASH_NON_VOL_SIZE];
-	int32_t ind = 0;
+void saveNonVolatileParameters(nonVolParameters* nonVols, uint8_t enqueu){
+	static uint8_t dataSavingEnqued = 0;
 
-	packNonVolatileParameters(nonVols, packedData, &ind);
+	if( enqueu == 1 ){
+		dataSavingEnqued = 1;
+	}
 
-	storeNonVolatileParameters(packedData, ind);
+	if( enqueu == 0 && dataSavingEnqued == 1 ){
+		//pack the non-volatile data in a specific order into the struct
+		uint8_t packedData[__FLASH_NON_VOL_SIZE];
+		int32_t ind = 0;
+
+		packNonVolatileParameters(nonVols, packedData, &ind);
+
+		storeNonVolatileParameters(packedData, ind);
+
+		dataSavingEnqued = 0;
+	}
 
 }
 
@@ -224,7 +234,7 @@ void unpackNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray){
 
 void packNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray, int32_t* ind){
 	buffer_append_uint16(dataArray, nonVols->FW_version, ind);	//Important
-	dataArray[*ind++] = nonVols->genParas.canID;					//Important
+	dataArray[(*ind)++] = nonVols->genParas.canID;					//Important
 
 	buffer_append_uint16(dataArray, nonVols->chgParas.packCellCount, ind);
 	buffer_append_uint16(dataArray, nonVols->chgParas.maxChgCurr, ind);
@@ -260,12 +270,12 @@ void packNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray, in
 	buffer_append_uint16(dataArray, nonVols->adcParas.AdcOversampling, ind);
 
 	buffer_append_uint16(dataArray, nonVols->genParas.stayActiveTime, ind);
-	dataArray[*ind++] = nonVols->genParas.alwaysBalancing;
-	dataArray[*ind++] = nonVols->genParas.always5vRequest;
-	dataArray[*ind++] = nonVols->genParas.duringActive5vOn;
+	dataArray[(*ind)++] = nonVols->genParas.alwaysBalancing;
+	dataArray[(*ind)++] = nonVols->genParas.always5vRequest;
+	dataArray[(*ind)++] = nonVols->genParas.duringActive5vOn;
 	buffer_append_uint16(dataArray, nonVols->genParas.storageCellVoltage, ind);
 	buffer_append_uint16(dataArray, nonVols->genParas.timeToStorageDischarge, ind);
-	dataArray[*ind++] = nonVols->genParas.canActivityTick;
+	dataArray[(*ind)++] = nonVols->genParas.canActivityTick;
 	buffer_append_uint16(dataArray, nonVols->genParas.canRxRefreshActive, ind);
 }
 
@@ -745,12 +755,7 @@ void statusLed(void){
 		if( state == 0 ){
 			__RED_LED_OFF;
 			__GREEN_LED_OFF;
-			if( nonVolPars.genParas.canActivityTick == 1 && CAN1_rxAvailable() == 1 ){	//CAN activity cyan flick
-				__GREEN_LED_ON;
-				__RED_LED_OFF;
-				__BLUE_LED_ON;
-			}
-			else if( runtimePars.usbConnected == 1 ){	//USB connected
+			if( runtimePars.usbConnected == 1 ){	//USB connected
 				__BLUE_LED_ON;
 			}
 			else{
@@ -759,12 +764,7 @@ void statusLed(void){
 		}
 		else{
 			__BLUE_LED_OFF;
-			if( nonVolPars.genParas.canActivityTick == 1 && CAN1_rxAvailable() == 1 ){	//CAN activity cyan flick
-				__GREEN_LED_ON;
-				__RED_LED_OFF;
-				__BLUE_LED_ON;
-			}
-			else if( runtimePars.activeFaults != 0 || runtimePars.chargingState == faultState ){	//if active faults found -> status LED = RED
+			if( runtimePars.activeFaults != 0 || runtimePars.chargingState == faultState ){	//if active faults found -> status LED = RED
 				__GREEN_LED_OFF;
 				__RED_LED_ON;
 			}
@@ -834,7 +834,7 @@ void updateStorageTimer(void){
 	}
 }
 
-void jumpToBootloader(void){
+void jumpToStmBootloader(void){
 
 	//Stop and de-init USB stack
 	USBD_DeInit(&hUsbDeviceFS);
@@ -871,6 +871,46 @@ void jumpToBootloader(void){
 	asm("ldr r0, =0x1FFF0000"); //load R0 register with constant value 0x1FFF 0000, in this case the beginning of STM bootloader
 	asm("ldr sp, [r0, #0]");	//load SP with value that R0 points to	*0x1FFF 0000 (End of stack)
 	asm("ldr r0, [r0, #4]");	//load R0 with value R0 + 4 points to *0x1FFF 0004 (Reset Vector)
+	asm("bx r0");				//jump there
+}
+
+void jumpToCustomBootloader(void){
+
+	//Stop and de-init USB stack
+	USBD_DeInit(&hUsbDeviceFS);
+	__disable_irq();
+
+	//de-init all peripherals
+	SysTick->CTRL = 4;	//reset systick to default state (no interrupt enabled)
+
+	RCC->AHB2RSTR = ~(0x00000000);		//Reset all peripherals in AHB2 bus
+	RCC->AHB2ENR = 0;				//disable all peripheral clocks in AHB2 bus
+	RCC->AHB2RSTR = 0;			//Clear reset all peripherals in AHB2 bus
+
+	RCC->APB1RSTR1 = ~(0x00000400);		//Reset all peripherals in APB1 bus, except RTC peripheral
+	RCC->APB1ENR1 = 0x00000400;			//disable all peripheral clocks in APB1 bus
+	RCC->APB1RSTR1 = 0;			//Clear reset all peripherals in APB1 bus
+
+	RCC->APB2RSTR = ~(0x00000000);		//Reset all peripherals in APB2 bus
+	RCC->APB2ENR = 0;			//disable all peripheral clocks in APB2 bus
+	RCC->APB2RSTR = 0;			//Clear reset all peripherals in APB2 bus
+
+
+	//check oscillator status, MSI as main clock @ 4 MHz and everything else off
+	//check if USB's 48 MHz internal oscillator on
+	if( (RCC->CRRCR & (1 << 0)) != 0 ){	//HSI48_ON bit
+		RCC->CRRCR = 0;					//disable
+	}
+	if( ((RCC->CR & (0xF << 4)) >> 4) != 6 ){	//check if MSI_range something else than 6 (4 MHz speed)
+		RCC->CR = (RCC->CR & ~(0xF << 4)) | (6 << 4);	//set MSI_range to 6 (4 MHz speed)
+	}
+
+	for(uint32_t x=0; x<1400000; x++);
+
+	//jump to STM bootloader
+	asm("ldr r0, =0x08019000"); //load R0 register with constant value 0x0801 9000, in this case the beginning of flash page 50, where the custom bootloader resides
+	asm("ldr sp, [r0, #0]");	//load SP with value that R0 points to	*0x0801 9000 (End of stack)
+	asm("ldr r0, [r0, #4]");	//load R0 with value R0 + 4 points to *0x0801 9004 (Reset Vector)
 	asm("bx r0");				//jump there
 }
 

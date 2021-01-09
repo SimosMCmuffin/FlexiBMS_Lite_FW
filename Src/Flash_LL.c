@@ -35,6 +35,7 @@ uint8_t checkFlashAddress(uint32_t flashAddr){
 uint8_t eraseFlashPage(uint8_t flashPage){
 	while (FLASH->SR & FLASH_SR_BSY);	//wait for Flash not to be busy
 
+	__disable_irq();
 	if( !!(FLASH->CR & (1 << 31)) == 1 ){	//is flash locked?
 		FLASH->KEYR = 0x45670123;		//write flash unlock keys
 		FLASH->KEYR = 0xCDEF89AB;
@@ -52,10 +53,14 @@ uint8_t eraseFlashPage(uint8_t flashPage){
 	FLASH->CR &= ~(1 << 1);		//clear page erase enabled bit
 	FLASH->CR |= (1 << 31);		//set flash LOCK bit
 
-	if( !!(FLASH->SR & (1 << 0)) == 1 )		//check if End Of Operation flag is up, indicating successful erase
+	if( !!(FLASH->SR & (1 << 0)) == 1 ){		//check if End Of Operation flag is up, indicating successful erase
+		__enable_irq();
 		return 1;
-	else
+	}
+	else{
+		__enable_irq();
 		return 0;
+	}
 }
 
 uint8_t readFlash(void* data, uint32_t flashAddr, uint32_t dataLen){
@@ -76,6 +81,7 @@ uint8_t writeFlashDword(uint32_t flashAddr, uint64_t data){
 
 	while (FLASH->SR & FLASH_SR_BSY);	//wait for Flash not to be busy
 
+	__disable_irq();
 	if( !!(FLASH->CR & (1 << 31)) == 1 ){	//is flash locked?
 		FLASH->KEYR = 0x45670123;		//write flash unlock keys
 		FLASH->KEYR = 0xCDEF89AB;
@@ -92,8 +98,12 @@ uint8_t writeFlashDword(uint32_t flashAddr, uint64_t data){
 	FLASH->CR &= ~(1 << 0);	//disable Flash programming
 	FLASH->CR |= (1 << 31);		//set flash LOCK bit
 
-	if( !!(FLASH->SR & (1 << 0)) == 1 )		//check if End Of Operation flag is up, indicating successful erase
+	if( !!(FLASH->SR & (1 << 0)) == 1 ){		//check if End Of Operation flag is up, indicating successful erase
+		__enable_irq();
 		return 1;
-	else
+	}
+	else{
+		__enable_irq();
 		return 0;
+	}
 }

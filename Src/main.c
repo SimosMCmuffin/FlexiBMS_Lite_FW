@@ -57,6 +57,8 @@ int main(void)
 		if( systemTick + 25 <= HAL_GetTick() ){		//go in here at max every 25ms
 			systemTick = HAL_GetTick();
 
+			statusLed();		//Control status LED
+
 			usbPowerPresent();		//check if 5V is detected from the USB connector
 			updateOptoState();		//read state of the Opto-isolator
 			updateActiveTimer();	//update activeTimer flags
@@ -65,9 +67,11 @@ int main(void)
 
 		}
 
-		statusLed();		//Control status LED
+
 
 		//CAN1_process_message();
+
+		saveNonVolatileParameters(&nonVolPars, 0);
 
 		hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
 
