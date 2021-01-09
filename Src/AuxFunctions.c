@@ -73,6 +73,7 @@ uint8_t initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 				nonVols->genParas.canRxRefreshActive = 0;
 
 			case ((0 << 8) | 16 ):	//0.16
+			case ((0 << 8) | 17 ):	//0.17
 
 			break;
 		}
