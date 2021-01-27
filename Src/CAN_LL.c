@@ -451,12 +451,21 @@ void CAN1_TX_IRQHandler(void){
 
 	if( !!(CAN1->TSR & (1 << 0)) == 1 ){	//TX mailbox 0 transmit request complete
 
-		if( !!(CAN1->TSR & (1 << 1)) == 0 ){	//check if the mailbox message was transmitted successfully and retry is failed
-			retryAttempts++;
-			if(retryAttempts < 10){				//only allow a fixed amount of re-transmit attempts, as to not get stuck
+		if( !!(CAN1->TSR & (1 << 2)) == 1 ){	//check if arbitration was lost during transmit attempt and retry if failed
+
+			CAN1->sTxMailBox[0].TIR |= (1 << 0);		//request new TX attempt with old mailbox content, aka retry
+			return;
+
+		}
+
+		if( !!(CAN1->TSR & (1 << 3)) == 1 ){	//check if bus error happened during last transmit attempt and retry couple times if failed
+
+			if(retryAttempts < 3){				//only allow a fixed amount of re-transmit attempts, as to not get stuck
 				CAN1->sTxMailBox[0].TIR |= (1 << 0);		//request new TX attempt with old mailbox content, aka retry
+				retryAttempts++;
 				return;
 			}
+
 		}
 
 		retryAttempts = 0;
