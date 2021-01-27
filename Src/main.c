@@ -68,7 +68,6 @@ int main(void)
 		}
 
 
-
 		//CAN1_process_message();
 
 		saveNonVolatileParameters(&nonVolPars, 0);

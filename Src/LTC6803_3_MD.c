@@ -95,38 +95,42 @@ void LTC6803_readInternalTemperature(void){		//Start SPI communication to retrie
 }
 
 void LTC6803_convertCellVoltages(void){		//convert raw normal cell measurement results from ltc6803 to milliVolts
+	uint16_t tempV[12];
+
 	for(uint8_t x=0; x<6; x++){				//un-pack the conversion results which are 12-bit long
-		LTC_data.cVoltages[(x*2)] = LTC_data.Cells[(x*3)] | (LTC_data.Cells[(x*3)+1] << 8);
-		LTC_data.cVoltages[(x*2)] &= 0x0FFF;
-		LTC_data.cVoltages[(x*2)+1] = (LTC_data.Cells[(x*3)+2] << 4) | (LTC_data.Cells[(x*3)+1] >> 4);
-		LTC_data.cVoltages[(x*2)+1] &= 0x0FFF;
+		tempV[(x*2)] = LTC_data.Cells[(x*3)] | (LTC_data.Cells[(x*3)+1] << 8);
+		tempV[(x*2)] &= 0x0FFF;
+		tempV[(x*2)+1] = (LTC_data.Cells[(x*3)+2] << 4) | (LTC_data.Cells[(x*3)+1] >> 4);
+		tempV[(x*2)+1] &= 0x0FFF;
 	}
 
 	for(uint8_t x=0; x<12; x++){			//convert results into millivolts. Aka 3,856V = 3856mV
-		if(LTC_data.cVoltages[x] > 512)
-			LTC_data.cVoltages[x] -= 512;
+		if(tempV[x] > 512)
+			tempV[x] -= 512;
 		else
-			LTC_data.cVoltages[x] = 0;
+			tempV[x] = 0;
 
-		LTC_data.cVoltages[x] *= 1.5;
+		LTC_data.cVoltages[x] = tempV[x] * 1.5;
 	}
 }
 
 void LTC6803_convertOpenCellVoltages(void){	//convert raw open cell measurement results from ltc6803 to milliVolts
+	uint16_t tempV[12];
+
 	for(uint8_t x=0; x<6; x++){				//un-pack the conversion results which are 12-bit long
-		LTC_data.oVoltages[(x*2)] = LTC_data.Cells[(x*3)] | (LTC_data.Cells[(x*3)+1] << 8);
-		LTC_data.oVoltages[(x*2)] &= 0x0FFF;
-		LTC_data.oVoltages[(x*2)+1] = (LTC_data.Cells[(x*3)+2] << 4) | (LTC_data.Cells[(x*3)+1] >> 4);
-		LTC_data.oVoltages[(x*2)+1] &= 0x0FFF;
+		tempV[(x*2)] = LTC_data.Cells[(x*3)] | (LTC_data.Cells[(x*3)+1] << 8);
+		tempV[(x*2)] &= 0x0FFF;
+		tempV[(x*2)+1] = (LTC_data.Cells[(x*3)+2] << 4) | (LTC_data.Cells[(x*3)+1] >> 4);
+		tempV[(x*2)+1] &= 0x0FFF;
 	}
 
 	for(uint8_t x=0; x<12; x++){			//convert results into millivolts. Aka 3,856V = 3856mV
-		if(LTC_data.oVoltages[x] > 512)
-			LTC_data.oVoltages[x] -= 512;
+		if(tempV[x] > 512)
+			tempV[x] -= 512;
 		else
-			LTC_data.oVoltages[x] = 0;
+			tempV[x] = 0;
 
-		LTC_data.oVoltages[x] *= 1.5;
+		LTC_data.oVoltages[x] *= tempV[x] * 1.5;
 	}
 }
 
