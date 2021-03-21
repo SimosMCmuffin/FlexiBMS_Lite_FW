@@ -1,9 +1,21 @@
 /*
- * USB_comms_handler.h
- *
- *  Created on: 20.7.2019
- *      Author: Simos MCmuffin
- */
+	Copyright 2019 - 2021 Simo Sihvonen	"Simos MCmuffin" - simo.sihvonen@gmail.com
+
+	This file is part of the FlexiBMS Lite firmware.
+
+	The FlexiBMS Lite firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The FlexiBMS Lite firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #ifndef USB_COMMS_HANDLER_MD_H_
 #define USB_COMMS_HANDLER_MD_H_
@@ -56,6 +68,7 @@ typedef enum
 
 	duringActive5vOn,
 	canRxRefreshActive,
+	canWakeUp,
 
 	numberOfElements
 }_parameter_ID;
@@ -81,6 +94,7 @@ void set_stayActiveTime(float*);
 void report_state(void);
 void report_statePrint(void);
 void report_faults(void);
+void zero_faults(void);
 void report_loadDefaults(void);
 void report_firmware(void);
 void report_hardware(void);
@@ -101,6 +115,7 @@ void appendFloat(uint8_t*, float, uint16_t*);
 void appendString(uint8_t*, const uint8_t*, uint16_t*);
 void appendParameter(uint8_t*, uint16_t, uint16_t*);
 void appendChargingState(uint8_t*, uint16_t, uint16_t*);
+void appendChargingEndFlag(uint8_t*, uint16_t, uint16_t*);
 void appendFault(uint8_t*, uint16_t, uint16_t*);
 
 

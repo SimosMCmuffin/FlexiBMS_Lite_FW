@@ -1,3 +1,22 @@
+/*
+	Copyright 2019 - 2021 Simo Sihvonen	"Simos MCmuffin" - simo.sihvonen@gmail.com
+
+	This file is part of the FlexiBMS Lite firmware.
+
+	The FlexiBMS Lite firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The FlexiBMS Lite firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include "commands.h"
@@ -148,6 +167,7 @@ void commands_process_packet(uint8_t from, uint8_t *data, unsigned int len,
 		nonVolPars.genParas.canID = data[ind++];
 		nonVolPars.genParas.duringActive5vOn = data[ind++];
 		nonVolPars.genParas.canRxRefreshActive = buffer_get_uint16(data, &ind);
+		nonVolPars.genParas.canWakeUp = data[ind++];
 		ind = 0;
 		send_buffer[ind++] = packet_id;
 		send_buffer[ind++] = nonVolPars.genParas.canID;
@@ -191,6 +211,7 @@ void commands_process_packet(uint8_t from, uint8_t *data, unsigned int len,
 		send_buffer[ind++] = nonVolPars.genParas.canID;
 		send_buffer[ind++] = nonVolPars.genParas.duringActive5vOn;
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.canRxRefreshActive, &ind);
+		send_buffer[ind++] = nonVolPars.genParas.canWakeUp;
 		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_STORE_BMS_CONF:

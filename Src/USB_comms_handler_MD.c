@@ -1,8 +1,20 @@
 /*
- * USB_comms_handler.c
- *
- *  Created on: 21.7.2019
- *      Author: Simos MCmuffin
+	Copyright 2019 - 2021 Simo Sihvonen	"Simos MCmuffin" - simo.sihvonen@gmail.com
+
+	This file is part of the FlexiBMS Lite firmware.
+
+	The FlexiBMS Lite firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The FlexiBMS Lite firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <USB_comms_handler_MD.h>
@@ -47,6 +59,9 @@ void USB_checkForNewMessages(){
 					break;
 				case 'F':
 					report_faults();
+					break;
+				case 'G':
+					zero_faults();
 					break;
 				case 'B':
 					jumpToStmBootloader();
@@ -238,6 +253,7 @@ void set_parameter(float* value, _parameter_ID parameterID){
 		break;
 	case timeToStorageDischarge:
 		nonVolPars.genParas.timeToStorageDischarge = (uint16_t)*value;
+		runtimePars.storageTick = HAL_GetTick() + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS );
 		break;
 	case canActivityTick:
 		nonVolPars.genParas.canActivityTick = (uint8_t)*value;
@@ -250,6 +266,9 @@ void set_parameter(float* value, _parameter_ID parameterID){
 		break;
 	case canRxRefreshActive:
 		nonVolPars.genParas.canRxRefreshActive = (uint16_t)*value;
+		break;
+	case canWakeUp:
+		nonVolPars.genParas.canWakeUp = (uint8_t)*value;
 		break;
 	default:
 		report_error(error_invalidMessageID);
@@ -273,9 +292,20 @@ void report_faults(void){
 	uint8_t text[256] = {};
 	uint16_t pos = 0;
 
-	static const uint8_t Ftext1[] = {"\r\nLatched faults:"};
-	static const uint8_t Ftext2[] = {"\r\nActive faults:"};
+	static const uint8_t Ftext1[] = {"\r\nFault count:"};
+	static const uint8_t Ftext2[] = {"\r\nLatched faults:"};
 	appendString(text, Ftext1, &pos);
+
+	for(uint8_t x=0; x<fault_numberOfElements; x++){
+		if( runtimePars.faultCount[x] != 0 ){
+			appendFault(text, x, &pos);
+			appendUint16(text, runtimePars.faultCount[x], &pos);
+			text[pos] = '_';
+			pos++;
+		}
+	}
+
+	appendString(text, Ftext2, &pos);
 
 	for(uint8_t x=0; x<fault_numberOfElements; x++){
 		if( !!(runtimePars.latchedFaults & ((uint64_t)1 << x)) ){
@@ -283,13 +313,24 @@ void report_faults(void){
 		}
 	}
 
-	appendString(text, Ftext2, &pos);
+	text[pos] = '\r';
+	pos++;
+	text[pos] = '\n';
+	pos++;
+
+	while( CDC_Transmit_FS(text, pos) );
+}
+
+void zero_faults(void){
+	uint8_t text[64] = {};
+	uint16_t pos = 0;
 
 	for(uint8_t x=0; x<fault_numberOfElements; x++){
-		if( !!(runtimePars.activeFaults & ((uint64_t)1 << x)) ){
-			appendFault(text, x, &pos);
-		}
+		runtimePars.faultCount[x] = 0;
 	}
+
+	static const uint8_t Ftext1[] = {"\r\nFault counts reset"};
+	appendString(text, Ftext1, &pos);
 
 	text[pos] = '\r';
 	pos++;
@@ -306,6 +347,7 @@ void report_statePrint(void){
 	if( runtimePars.statePrintout == 0 ){
 		runtimePars.statePrintout = 1;
 		CDC_Transmit_FS(Ftext1, sizeof(Ftext1)-1);
+		ADC_clearMaxMin();
 	}
 	else{
 		runtimePars.statePrintout = 0;
@@ -379,7 +421,7 @@ void report_UID(void){
 }
 
 void report_state(void){
-	uint8_t text[128] = {};
+	uint8_t text[192] = {};
 	uint16_t pos = 0;
 
 	static const uint8_t Ftext1[] = {"State:"};
@@ -391,15 +433,33 @@ void report_state(void){
 		pos++;
 	}
 
+	appendUint16(text, ADC_HighMin[batteryVoltage][0], &pos);
+	text[pos] = '-';
+	pos++;
 	appendUint16(text, ADC_convertedResults[batteryVoltage], &pos);
+	text[pos] = '-';
+	pos++;
+	appendUint16(text, ADC_HighMin[batteryVoltage][1], &pos);
 	text[pos] = ':';
 	pos++;
 
+	appendUint16(text, ADC_HighMin[chargerVoltage][0], &pos);
+	text[pos] = '-';
+	pos++;
 	appendUint16(text, ADC_convertedResults[chargerVoltage], &pos);
+	text[pos] = '-';
+	pos++;
+	appendUint16(text, ADC_HighMin[chargerVoltage][1], &pos);
 	text[pos] = ':';
 	pos++;
 
+	appendUint16(text, ADC_HighMin[chargeCurrent][0], &pos);
+	text[pos] = '-';
+	pos++;
 	appendUint16(text, ADC_convertedResults[chargeCurrent], &pos);
+	text[pos] = '-';
+	pos++;
+	appendUint16(text, ADC_HighMin[chargeCurrent][1], &pos);
 	text[pos] = ':';
 	pos++;
 
@@ -416,6 +476,12 @@ void report_state(void){
 	pos++;
 
 	appendChargingState(text, runtimePars.chargingState, &pos);
+	if( runtimePars.chargingEndFlag != chargingEnd_none ){
+		pos--;
+		text[pos] = '-';
+		pos++;
+		appendChargingEndFlag(text, runtimePars.chargingEndFlag, &pos);
+	}
 
 	text[pos] = '\r';
 	pos++;
@@ -423,6 +489,8 @@ void report_state(void){
 	pos++;
 
 	CDC_Transmit_FS(text, pos);
+
+	ADC_clearMaxMin();
 }
 
 void report_help(){
@@ -432,6 +500,7 @@ void report_help(){
 							"$$ (view configurable parameters)\r\n"
 							"$R (turn BMS state report ON/OFF)\r\n"
 							"$F (view BMS faults)\r\n"
+							"$G (reset BMS fault counts)\r\n"
 							"$W (print FW version)\r\n"
 							"$H (print HW version)\r\n"
 							"$C (print board Unique ID)\r\n"
@@ -732,6 +801,11 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		static const uint8_t description40[] = {" (h (Hours), up to how many hours a CAN-frame reception can extend activeTimer, set to 0 to disable, uint16_t)\r\n"};
 		appendString(text, description40, pos);
 		break;
+	case canWakeUp:
+		appendUint16(text, nonVolPars.genParas.canWakeUp, pos);
+		static const uint8_t description41[] = {" (1 or 0, can be used to allow CAN activity to wake-up the BMS from sleep, increases sleep mode quiescent current slightly, set to 0 to disable, boolean)\r\n"};
+		appendString(text, description41, pos);
+		break;
 	default:;
 		static const uint8_t description33[] = {" (parameter error)\r\n"};
 		appendString(text, description33, pos);
@@ -773,6 +847,26 @@ void appendChargingState(uint8_t* text, uint16_t state, uint16_t* pos){
 		break;
 	default:
 		break;
+	}
+
+}
+
+void appendChargingEndFlag(uint8_t* text, uint16_t flag, uint16_t* pos){
+
+	if( flag >= chargingEnd_termCellVoltage0 && flag <= chargingEnd_termCellVoltage11 ){
+		static const uint8_t description0[] = {"cell"};
+		appendString(text, description0, pos);
+		appendUint16(text, (flag-2), pos);
+		static const uint8_t description1[] = {"TermVoltage:"};
+		appendString(text, description1, pos);
+	}
+	else if( flag == chargingEnd_termChargingCurrent ){
+		static const uint8_t description0[] = {"chargingTermCurrent:"};
+		appendString(text, description0, pos);
+	}
+	else{
+		static const uint8_t description0[] = {"packTermVoltage:"};
+		appendString(text, description0, pos);
 	}
 
 }

@@ -103,6 +103,26 @@ typedef enum
 
 typedef enum
 {
+	chargingEnd_none,
+	chargingEnd_termPackVoltage,
+	chargingEnd_termCellVoltage0,
+	chargingEnd_termCellVoltage1,
+	chargingEnd_termCellVoltage2,
+	chargingEnd_termCellVoltage3,
+	chargingEnd_termCellVoltage4,
+	chargingEnd_termCellVoltage5,
+	chargingEnd_termCellVoltage6,
+	chargingEnd_termCellVoltage7,
+	chargingEnd_termCellVoltage8,
+	chargingEnd_termCellVoltage9,
+	chargingEnd_termCellVoltage10,
+	chargingEnd_termCellVoltage11,
+	chargingEnd_termChargingCurrent,
+	chargingEnd_numberOfElements
+}_chargingEnd_ID;
+
+typedef enum
+{
 	usb5vRequest = 0,
 	charging5vRequest,
 	ntc5vRequest,
@@ -170,6 +190,7 @@ typedef struct __attribute__((packed)) _generalParameters {
 	uint8_t canActivityTick;	//1 or 0, ticks the status led in magenta when can packets are received
 	uint8_t canID;				//canID that the BMS uses to recognize as itself
 	uint16_t canRxRefreshActive;	//h (hours),Receiving CAN messages refresh activeTimer up to this length, 0 to disable
+	uint8_t canWakeUp;			//1 or 0, allows or disallows CAN activity to wake-up BMS from sleep, increases quiescent current somewhat
 } generalParameters;
 
 typedef struct __attribute__((packed)) _nonVolParameters {
@@ -192,8 +213,9 @@ typedef struct _runtimeParameters {
 	uint16_t storageDischarged;
 	uint16_t chargingState;
 	uint16_t currentRunMode;
-	uint64_t activeFaults;
 	uint64_t latchedFaults;
+	uint16_t faultCount[fault_numberOfElements];
+	uint16_t chargingEndFlag;
 
 	uint16_t buck5vEnabled;
 	uint16_t buck5vRequest;
@@ -201,6 +223,7 @@ typedef struct _runtimeParameters {
 	uint16_t packVoltageRequest;
 	uint16_t chargerVoltageEnabled;
 	uint16_t chargerVoltageRequest;
+	uint16_t canActivity;
 
 	uint16_t charging;
 	uint16_t balancing;

@@ -1,8 +1,20 @@
 /*
- * CAN.c low level peripheral driver for STM32L433 for in use with FlexiBMS 0.2
- *
- *  Created on: 30.5.2018
- *      Author: Simos MCmuffin
+	Copyright 2019 - 2021 Simo Sihvonen	"Simos MCmuffin" - simo.sihvonen@gmail.com
+
+	This file is part of the FlexiBMS Lite firmware.
+
+	The FlexiBMS Lite firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The FlexiBMS Lite firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <stm32l4xx_hal.h>
@@ -69,12 +81,19 @@ void CAN1_init(){
 void CAN1_deInit(){
 
 	if( CAN_initialized == 1 ){			//check that CAN is initialized
+		NVIC_DisableIRQ(CAN1_RX0_IRQn);		//disable CAN1 RX mailbox 0 interrupt, stop new incoming messages and their handling
+		while( ISR_running == 1 );		//wait for any TX queue to be sent out
 		CAN1->MCR |= (1 << 1);		//request to enter sleep mode
-		while( !!(CAN1->MSR & (1 << 1)) == 0 || ISR_running == 1 );		//wait for bus activity to finish/stop and enter sleep mode
+		while( !!(CAN1->MSR & (1 << 1)) == 0 );		//wait for sleep command to be acknowledged
+		NVIC_DisableIRQ(CAN1_TX_IRQn);		//disable CAN1 TX interrupt
 		RCC->APB1ENR1 &= ~(1 << 25);			//Disable CAN1 bus clock
 
 		GPIOB->MODER &= ~( (3 << 16) | (3 << 18) );			//Configure pins PB8 and PB9 to analog state for low-power usage
 		GPIOB->MODER |= (3 << 16) | (3 << 18);
+
+		while( (CAN1->RF0R & (3 << 0)) != 0 ){		//empty out any received frames in mailbox 0
+			CAN1->RF0R |= (1 << 5);		//release received message
+		}
 
 		CAN_initialized = 0;		//mark CAN as non-initialized
 	}
@@ -83,7 +102,7 @@ void CAN1_deInit(){
 
 uint8_t CAN1_attempt_transmit(uint32_t ID, uint8_t * data, uint8_t length){
 
-	if( !!(CAN1->TSR & (1 << 26)) && CAN_initialized == 1 ){		//Check that TX mailbox 0 is empty and that CAN is iniatilized
+	if( !!(CAN1->TSR & (1 << 26)) && CAN_initialized == 1 ){		//Check that TX mailbox 0 is empty and that CAN is initialized
 		uint8_t TX_empty = 0;//(CAN1->TSR & (3 << 24)) >> 24;	//check which TX mailbox is empty
 
 		CAN1->sTxMailBox[TX_empty].TIR = 0;

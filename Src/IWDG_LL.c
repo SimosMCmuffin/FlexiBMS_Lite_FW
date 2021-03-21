@@ -15,18 +15,40 @@
 
     You should have received a copy of the GNU General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
-#ifndef FLASH_LL_H_
-#define FLASH_LL_H_
+#include "main.h"
+#include <IWDG_LL.h>
 
-#define __FLASH_PAGE_62	(0x0801F000)
-#define __FLASH_PAGE_63	(0x0801F800)
-#define __END_OF_FLASH	(0x08020000)
+void IWDG_init(void){
 
-uint8_t checkFlashAddress(uint32_t);
-uint8_t eraseFlashPage(uint8_t);
-uint8_t readFlash(void*, uint32_t, uint32_t);
-uint8_t writeFlashDword(uint32_t, uint64_t);
+	if( IWDG_initialized == 0 ){		//check that IWDG is not initialized
 
-#endif /* FLASH_LL_H_ */
+		DBGMCU->APB1FZR1 = 0x00001000;	//IDWG stopped when debugging
+
+		IWDG->KR = 0x5555;	//unlock access to IWDG registers
+		IWDG->PR = 6;		//prescaler 256, 8ms tick
+		IWDG->RLR = 1400;	//1400*8ms = 11200ms
+
+		IWDG_initialized = 1;		//mark IWDG as initialized
+	}
+
+}
+
+
+void IWDG_start(void){	//used to start IWDG
+
+	if( IWDG_initialized == 1){
+		IWDG->KR = 0xCCCC;	//start command for IWDG
+		for(uint8_t x=0; x<20; x++);
+		IWDG->KR = 0xAAAA;		//reset counter command for IWDG
+	}
+
+}
+
+void IWDG_zeroCounter(void){	//reset IWDG reset counter
+
+	IWDG->KR = 0xAAAA;		//reset counter command for IWDG
+
+}
+

@@ -1,9 +1,21 @@
 /*
- * ADC.h low level peripheral driver for STM32L433 for in use with FlexiBMS 0.2
- *
- *  Created on: 30.5.2018
- *      Author: Simos MCmuffin
- */
+	Copyright 2019 - 2021 Simo Sihvonen	"Simos MCmuffin" - simo.sihvonen@gmail.com
+
+	This file is part of the FlexiBMS Lite firmware.
+
+	The FlexiBMS Lite firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The FlexiBMS Lite firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #ifndef ADC_LL_H_
 #define ADC_LL_H_
@@ -26,7 +38,7 @@ typedef enum
 	mcuInternalTemp
 }_ADC_result;
 
-volatile uint16_t ADC_results[5], ADC_convertedResults[5], ADC_conversionIndex, ADC_initialized;
+volatile uint16_t ADC_results[5], ADC_convertedResults[5], ADC_HighMin[3][2], ADC_conversionIndex, ADC_initialized;
 volatile uint16_t TS_CAL1, TS_CAL2;
 float intTempStep, temp30Cvoltage;
 
@@ -44,6 +56,7 @@ uint8_t ADC_runSequence(void);
 
 void ADC_start(void);
 void ADC_stop(void);
+void ADC_clearMaxMin(void);
 uint8_t ADC_busyCheck(void);
 uint8_t ADC_isStopped(void);
 

@@ -1,8 +1,20 @@
 /*
- * ADC.c low level peripheral driver for STM32L433 for in use with FlexiBMS 0.2
- *
- *  Created on: 30.5.2018
- *      Author: Simos MCmuffin
+	Copyright 2019 - 2021 Simo Sihvonen	"Simos MCmuffin" - simo.sihvonen@gmail.com
+
+	This file is part of the FlexiBMS Lite firmware.
+
+	The FlexiBMS Lite firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The FlexiBMS Lite firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include "main.h"
@@ -77,14 +89,26 @@ void convertADCresults(void){
 	//battery voltage, mV
 	ADC_convertedResults[batteryVoltage] =
 			( ADC_results[batteryVoltage] * LSBres * (114.7/4.7) * nonVolPars.adcParas.ADC_chan_gain[batteryVoltage] ) + nonVolPars.adcParas.ADC_chan_offset[batteryVoltage];
+	if(ADC_convertedResults[batteryVoltage] < ADC_HighMin[batteryVoltage][0])	//check if result lower than the earlier MIN value
+		ADC_HighMin[batteryVoltage][0] = ADC_convertedResults[batteryVoltage];
+	if(ADC_convertedResults[batteryVoltage] > ADC_HighMin[batteryVoltage][1])	//check if result higher than the earlier MAX value
+		ADC_HighMin[batteryVoltage][1] = ADC_convertedResults[batteryVoltage];
 
 	//charger voltage, mV
 	ADC_convertedResults[chargerVoltage] =
 			( ADC_results[chargerVoltage] * LSBres * (117.2/4.7) * nonVolPars.adcParas.ADC_chan_gain[chargerVoltage] ) + nonVolPars.adcParas.ADC_chan_offset[chargerVoltage];
+	if(ADC_convertedResults[chargerVoltage] < ADC_HighMin[chargerVoltage][0])	//check if result lower than the earlier MIN value
+		ADC_HighMin[chargerVoltage][0] = ADC_convertedResults[chargerVoltage];
+	if(ADC_convertedResults[chargerVoltage] > ADC_HighMin[chargerVoltage][1])	//check if result higher than the earlier MAX value
+		ADC_HighMin[chargerVoltage][1] = ADC_convertedResults[chargerVoltage];
 
 	//current sense, mA
 	ADC_convertedResults[chargeCurrent] =
 			( ADC_results[chargeCurrent] * LSBres * 4 * nonVolPars.adcParas.ADC_chan_gain[chargeCurrent] ) + nonVolPars.adcParas.ADC_chan_offset[chargeCurrent];
+	if(ADC_convertedResults[chargeCurrent] < ADC_HighMin[chargeCurrent][0])	//check if result lower than the earlier MIN value
+		ADC_HighMin[chargeCurrent][0] = ADC_convertedResults[chargeCurrent];
+	if(ADC_convertedResults[chargeCurrent] > ADC_HighMin[chargeCurrent][1])	//check if result higher than the earlier MAX value
+		ADC_HighMin[chargeCurrent][1] = ADC_convertedResults[chargeCurrent];
 
 	//external temperature sense, Kelvin
 	//
@@ -94,6 +118,15 @@ void convertADCresults(void){
 	//internal MCU temperature sense, Kelvin
 	ADC_convertedResults[mcuInternalTemp] =
 			( ADC_results[mcuInternalTemp] * LSBres / 2.5 * nonVolPars.adcParas.ADC_chan_gain[mcuInternalTemp] ) + nonVolPars.adcParas.ADC_chan_offset[mcuInternalTemp];
+
+}
+
+void ADC_clearMaxMin(void){
+
+	for(uint8_t x=0; x<3; x++){
+		ADC_HighMin[x][0] = ADC_convertedResults[x];
+		ADC_HighMin[x][1] = ADC_convertedResults[x];
+	}
 
 }
 

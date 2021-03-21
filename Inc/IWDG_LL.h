@@ -17,16 +17,15 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef FLASH_LL_H_
-#define FLASH_LL_H_
+#ifndef IWDG_LL_H_
+#define IWDG_LL_H_
 
-#define __FLASH_PAGE_62	(0x0801F000)
-#define __FLASH_PAGE_63	(0x0801F800)
-#define __END_OF_FLASH	(0x08020000)
+volatile uint16_t IWDG_initialized;
 
-uint8_t checkFlashAddress(uint32_t);
-uint8_t eraseFlashPage(uint8_t);
-uint8_t readFlash(void*, uint32_t, uint32_t);
-uint8_t writeFlashDword(uint32_t, uint64_t);
+void IWDG_init(void);
 
-#endif /* FLASH_LL_H_ */
+void IWDG_start(void);
+void IWDG_zeroCounter(void);
+
+
+#endif /* IWDG_LL_H_ */

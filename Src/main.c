@@ -1,12 +1,22 @@
-/**
- ******************************************************************************
- * File Name          : main.c
- * Description        : Main program body
- * Author			  : Simo Sihvonen (Simos MCmuffin)
- ******************************************************************************
+/*
+	Copyright 2019 - 2021 Simo Sihvonen	"Simos MCmuffin" - simo.sihvonen@gmail.com
 
- ******************************************************************************
+	This file is part of the FlexiBMS Lite firmware.
+
+	The FlexiBMS Lite firmware is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The FlexiBMS Lite firmware is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "stm32l4xx_hal.h"
@@ -15,6 +25,7 @@
 #include <LTC6803_3_DD.h>
 #include <ADC_LL.h>
 #include <CAN_LL.h>
+#include <IWDG_LL.h>
 #include "AuxFunctions.h"
 #include <dStorage_MD.h>
 #include <USB_comms_handler_MD.h>
@@ -93,31 +104,64 @@ int main(void)
 				//occasionally enable ADC for couple conversion cycles to update analog readings
 				cycles++;
 
-				if( cycles == 20 ){
+				if( cycles == 30 ){
 					cycles = 0;
+					//__GREEN_LED_ON;
 					runtimePars.chargerVoltageRequest |= (1 << 0);
 					runtimePars.packVoltageRequest |= (1 << 0);
+					if( nonVolPars.genParas.canWakeUp == 1 ){	//If CAN activity allowed to wake-up the BMS from sleep
+						GPIOB->MODER &= ~(3 << 16);		//Set CAN1_RX pin as input
+						runtimePars.buck5vRequest |= (1 << always5vRequest);
+					}
 					hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
+					HAL_Delay(20);
+
 					ADC_init();						//init ADC low level HW
 					ADC_start();
-					HAL_Delay(200);
+
+					uint8_t state = !!(GPIOB->IDR & (1 << 8));
+					uint64_t startTick = HAL_GetTick();
+					uint16_t changes = 0;
+					while( startTick+120 > HAL_GetTick() ){
+						if( state != !!(GPIOB->IDR & (1 << 8)) ){
+							state = !!(GPIOB->IDR & (1 << 8));
+							changes++;
+						}
+
+					}
+
+					if(changes > 3){
+						//__RED_LED_OFF;
+						runtimePars.canActivity = 1;
+					}
+					else{
+						//__RED_LED_ON;
+						runtimePars.canActivity = 0;
+					}
+
+					//HAL_Delay(200);
 					ADC_stop();
 					ADC_deInit();
 					runtimePars.chargerVoltageRequest &= ~(1 << 0);
 					runtimePars.packVoltageRequest &= ~(1 << 0);
+					if( nonVolPars.genParas.canWakeUp == 1 )
+						runtimePars.buck5vRequest &= ~(1 << always5vRequest);
 					hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
+					//__GREEN_LED_OFF;
 				}
 
 				usbPowerPresent();		//check if 5V is detected from the USB connector
 				updateOptoState();		//read state of the Opto-isolator
 				updateActiveTimer();	//update activeTimer flags
+				runtimePars.canActivity = 0;
 				updateStorageTimer();	//update storageDischargeTimer flags
 				detectCharger();		//check if charger connected
 				changeRunMode();		//change running modes based on some flags
 				HAL_Delay(160);			//wait 160ms
 			}
-		}
 
+			HAL_Delay(320);
+		}
 
 	}
 }
