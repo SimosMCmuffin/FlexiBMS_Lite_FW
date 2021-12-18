@@ -29,6 +29,7 @@
 #include <SPI_LL.h>
 #include <buffer.h>
 #include <IWDG_LL.h>
+#include <datatypes.h>
 
 extern USBD_StatusTypeDef USBD_DeInit(USBD_HandleTypeDef *pdev);
 extern nonVolParameters nonVolPars;
@@ -54,7 +55,7 @@ uint8_t initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 				nonVols->genParas.stayActiveTime = 100;
 				nonVols->genParas.alwaysBalancing = 0;
 				nonVols->genParas.always5vRequest = 0;
-				nonVols->genParas.duringActive5vOn = 0;
+				nonVols->genParas.duringStandby5vOn = 0;
 				nonVols->genParas.storageCellVoltage = 3800;
 				nonVols->genParas.timeToStorageDischarge = 0;
 
@@ -89,6 +90,10 @@ uint8_t initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 			case ((0 << 8) | 17 ):	//0.17
 				nonVols->genParas.canWakeUp = 0;
 			case ((0 << 8) | 18 ):	//0.18
+				nonVols->genParas.parallelPackCount = 0;
+				nonVols->genParas.currentVoltageRatio = 100;
+				nonVols->chgParas.restartChargTime = 0;
+			case ((0 << 8) | 19 ):	//0.19
 
 			break;
 		}
@@ -108,7 +113,7 @@ uint8_t initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->genParas.stayActiveTime = 100;
 		nonVols->genParas.alwaysBalancing = 0;
 		nonVols->genParas.always5vRequest = 0;
-		nonVols->genParas.duringActive5vOn = 0;
+		nonVols->genParas.duringStandby5vOn = 0;
 		nonVols->genParas.storageCellVoltage = 3800;
 		nonVols->genParas.timeToStorageDischarge = 0;
 
@@ -139,6 +144,9 @@ uint8_t initNonVolatiles(nonVolParameters* nonVols, uint8_t loadDefaults){
 		nonVols->genParas.canID = CAN_ID;
 		nonVols->genParas.canRxRefreshActive = 0;
 		nonVols->genParas.canWakeUp = 0;
+		nonVols->genParas.parallelPackCount = 0;
+		nonVols->genParas.currentVoltageRatio = 100;
+		nonVols->chgParas.restartChargTime = 0;
 
 		nonVols->FW_version = (FW_VERSION_MAJOR << 8) | FW_VERSION_MINOR;
 
@@ -181,6 +189,22 @@ void initRuntimeParameters(runtimeParameters* runtimePars){
 
 	runtimePars->activeTick = HAL_GetTick() + ( nonVolPars.genParas.stayActiveTime * __TIME_HOUR_TICKS ) ;
 	runtimePars->storageTick = HAL_GetTick() + ( nonVolPars.genParas.timeToStorageDischarge * __TIME_HOUR_TICKS );
+
+	if( nonVolPars.genParas.parallelPackCount != 0 ){
+		uint8_t canIdCheck = 0;
+		for(uint8_t x=0; x<nonVolPars.genParas.parallelPackCount; x++){
+
+			if( nonVolPars.genParas.canID == (10+x) )	//skip over one CAN ID, if it's the same as the current BMS' CAN ID
+				canIdCheck++;
+
+			runtimePars->parPacks[x].parPackCanId = 10+canIdCheck+x;
+			runtimePars->parPacks[x].packVoltage = 0;
+			runtimePars->parPacks[x].chargingCurrent = 0;
+			runtimePars->parPacks[x].lastMessageTick = 0;
+			runtimePars->parPacks[x].bitFields = 0;
+		}
+
+	}
 }
 
 void saveNonVolatileParameters(nonVolParameters* nonVols, uint8_t enqueu){
@@ -246,12 +270,16 @@ void unpackNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray){
 	nonVols->genParas.stayActiveTime = buffer_get_uint16(dataArray, &ind);
 	nonVols->genParas.alwaysBalancing = dataArray[ind++];
 	nonVols->genParas.always5vRequest = dataArray[ind++];
-	nonVols->genParas.duringActive5vOn = dataArray[ind++];
+	nonVols->genParas.duringStandby5vOn = dataArray[ind++];
 	nonVols->genParas.storageCellVoltage = buffer_get_uint16(dataArray, &ind);
 	nonVols->genParas.timeToStorageDischarge = buffer_get_uint16(dataArray, &ind);
 	nonVols->genParas.canActivityTick = dataArray[ind++];
 	nonVols->genParas.canRxRefreshActive = buffer_get_uint16(dataArray, &ind);
 	nonVols->genParas.canWakeUp = dataArray[ind++];
+	nonVols->genParas.parallelPackCount = dataArray[ind++];
+	nonVols->genParas.currentVoltageRatio = dataArray[ind++];
+
+	nonVols->chgParas.restartChargTime = buffer_get_uint16(dataArray, &ind);
 }
 
 void packNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray, int32_t* ind){
@@ -294,12 +322,16 @@ void packNonVolatileParameters(nonVolParameters* nonVols, uint8_t* dataArray, in
 	buffer_append_uint16(dataArray, nonVols->genParas.stayActiveTime, ind);
 	dataArray[(*ind)++] = nonVols->genParas.alwaysBalancing;
 	dataArray[(*ind)++] = nonVols->genParas.always5vRequest;
-	dataArray[(*ind)++] = nonVols->genParas.duringActive5vOn;
+	dataArray[(*ind)++] = nonVols->genParas.duringStandby5vOn;
 	buffer_append_uint16(dataArray, nonVols->genParas.storageCellVoltage, ind);
 	buffer_append_uint16(dataArray, nonVols->genParas.timeToStorageDischarge, ind);
 	dataArray[(*ind)++] = nonVols->genParas.canActivityTick;
 	buffer_append_uint16(dataArray, nonVols->genParas.canRxRefreshActive, ind);
 	dataArray[(*ind)++] = nonVols->genParas.canWakeUp;
+	dataArray[(*ind)++] = nonVols->genParas.parallelPackCount;
+	dataArray[(*ind)++] = nonVols->genParas.currentVoltageRatio;
+
+	buffer_append_uint16(dataArray, nonVols->chgParas.restartChargTime, ind);
 }
 
 
@@ -358,69 +390,153 @@ uint8_t usbPowerPresent(void){		//Start and stop USB service depending on if 5V 
  * @brief  chargeControl : used to switch and monitor the charging
  */
 void chargeControl(void){
-	static uint64_t chargeTick = 0, auxTick = 0;
+	static uint64_t chargeTick = 0, auxTick = 0, restartTick = 0;
 	static uint16_t OCevent = 0;
 
-	//check if charger detected
-	if( runtimePars.chargerConnected == 1 ){
+	if(nonVolPars.genParas.parallelPackCount == 0){
+		//check if charger detected
+		if( runtimePars.chargerConnected == 1 ){
 
-		if( runtimePars.chargingState == notCharging && !!(runtimePars.buck5vRequest & (1 << charging5vRequest)) == 0 ){	//wait for 5V supply to stabilize
-			runtimePars.buck5vRequest |= (1 << charging5vRequest);		//request 5V buck
-			__ENABLE_5V_BUCK;
-			HAL_Delay(25);
+			if( runtimePars.chargingState == notCharging && !!(runtimePars.buck5vRequest & (1 << charging5vRequest)) == 0 ){	//wait for 5V supply to stabilize
+				runtimePars.buck5vRequest |= (1 << charging5vRequest);		//request 5V buck
+				__ENABLE_5V_BUCK;
+				HAL_Delay(25);
+			}
+
+			//if( runtimePars.chargingState == notCharging ){
+			//	runtimePars.activeFaults = 0;		//clear active faults
+			//}
+
+			checkChargerVoltageFault();
+			checkBMStemperatureFault();
+			checkNTCtemperatureFault();
+			checkCellVoltageFaults();
+			checkPackVoltageFault();
+
+			if( runtimePars.chargingState == charging ){
+				checkMaxCurrentFault();
+			}
+
+			if( /*runtimePars.activeFaults == 0 && */runtimePars.chargingState == notCharging && runtimePars.buck5vEnabled == 1){
+				//allow charging to start
+				runtimePars.chargingState = chargingStarting;
+				chargeTick = HAL_GetTick() + 250;
+			}
+		}
+		else if( 	runtimePars.chargerConnected == 0 && runtimePars.chargingState == chargingStarting /* &&
+				runtimePars.chargingState == notCharging	*/){
+			runtimePars.chargingState = notCharging;
+			runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
 		}
 
-		//if( runtimePars.chargingState == notCharging ){
-		//	runtimePars.activeFaults = 0;		//clear active faults
-		//}
-
-		checkChargerVoltageFault();
-		checkBMStemperatureFault();
-		checkNTCtemperatureFault();
-		checkCellVoltageFaults();
-		checkPackVoltageFault();
-
-		if( runtimePars.chargingState == charging ){
-			checkMaxCurrentFault();
+		if( 	runtimePars.chargingState != notCharging && runtimePars.chargingState != faultState &&
+				runtimePars.latchedFaults != 0 ){
+			//if faults found, set state machine to fault wait state
+			runtimePars.chargingState = faultState;
+			chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
 		}
 
-		if( /*runtimePars.activeFaults == 0 && */runtimePars.chargingState == notCharging && runtimePars.buck5vEnabled == 1){
-			//allow charging to start
-			runtimePars.chargingState = chargingStarting;
-			chargeTick = HAL_GetTick() + 250;
-		}
-	}
-	else if( 	runtimePars.chargerConnected == 0 && runtimePars.chargingState == chargingStarting &&
-				runtimePars.chargingState == notCharging	){
-		runtimePars.chargingState = notCharging;
-		runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
-	}
-
-	if( 	runtimePars.chargingState != notCharging && runtimePars.chargingState != faultState &&
-			runtimePars.latchedFaults != 0 ){
-		//if faults found, set state machine to fault wait state
-		runtimePars.chargingState = faultState;
-		chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
-	}
-
-	balanceControl();	//control/monitor cell balancing
+		balanceControl();	//control/monitor cell balancing
 
 
-	switch(runtimePars.chargingState){
-	case notCharging:
-		__DISABLE_CHG;
-		runtimePars.charging = 0;
-		break;
+		switch(runtimePars.chargingState){
+		case notCharging:
+			__DISABLE_CHG;
+			runtimePars.charging = 0;
+			break;
 
-	case chargingStarting:
-		if( chargeTick <= HAL_GetTick() ){
-			//start charging, monitor current and voltages real-time for a couple hundred milliseconds
-			//before enabling charge path, check that cell and pack voltages below termination voltage
+		case chargingStarting:
+			if( chargeTick <= HAL_GetTick() ){
+				//start charging, monitor current and voltages real-time for a couple hundred milliseconds
+				//before enabling charge path, check that cell and pack voltages below termination voltage
+				if( nonVolPars.chgParas.packCellCount != 0 ){
+					for( uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){
+						if( LTC6803_getCellVoltage(x) > nonVolPars.chgParas.termCellVolt ){	//if cell voltage above termination voltage, jump directly end/wait state
+							runtimePars.chargingState = chargingEnd;
+							runtimePars.chargingEndFlag = chargingEnd_termCellVoltage0+x;	//mark specific cell's voltage termination limit as end flag
+							restartTick = HAL_GetTick() + (nonVolPars.chgParas.restartChargTime * 1000);	//update restart tick timer
+							break;
+						}
+					}
+				}
+				else{
+					if( ADC_convertedResults[batteryVoltage] > nonVolPars.chgParas.termPackVolt ){
+						runtimePars.chargingState = chargingEnd;
+						runtimePars.chargingEndFlag = chargingEnd_termPackVoltage;	//mark pack's voltage termination limit as end flag
+						restartTick = HAL_GetTick() + (nonVolPars.chgParas.restartChargTime * 1000);	//update restart tick timer
+						break;
+					}
+
+				}
+
+				if( runtimePars.latchedFaults != 0 ){	//before opening charging FETs, check that there aren't faults
+					runtimePars.chargingState = faultState;
+				}
+				else{
+					chargeTick = HAL_GetTick() + 300;
+					auxTick = HAL_GetTick();
+
+					__ENABLE_CHG;
+					runtimePars.charging = 1;
+
+					OCevent = 0;
+					runtimePars.chargingState = startingCurrent;
+				}
+
+			}
+			break;
+
+		case startingCurrent:
+			//monitor the current, allow max 250ms of overcurrent period and stop charging if the current isn't above the termination current limit in 500ms at the end
+			if( (auxTick + 1) <= HAL_GetTick() ){	//check roughly every 1 ms
+				auxTick++;
+
+
+				if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.maxChgCurr ){	//check for overcurrent event
+					OCevent++;
+				}
+
+				if( OCevent > 35 ){	//if overcurrent event has been happening long enough (35ms), terminate charge
+					runtimePars.latchedFaults |= ((uint64_t)1 << fault_highChargingCurrent);
+					runtimePars.faultCount[fault_highChargingCurrent] += 1;
+					runtimePars.chargingState = faultState;
+					chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
+					__DISABLE_CHG;
+					break;
+				}
+
+
+				if( chargeTick <= HAL_GetTick() ){	//if at the end of the starting period the current is below the termination current, go to end-of-charge
+					if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.termCurr ){
+						runtimePars.chargingState = charging;
+					}
+					else{
+						runtimePars.chargingState = chargingEnd;
+						runtimePars.chargingEndFlag = chargingEnd_termChargingCurrent;	//mark charging current termination limit as end flag
+						restartTick = HAL_GetTick() + (nonVolPars.chgParas.restartChargTime * 1000);	//update restart tick timer
+						__DISABLE_CHG;
+					}
+				}
+			}
+			break;
+
+		case charging:
+
+			if( ADC_convertedResults[chargeCurrent] < nonVolPars.chgParas.termCurr ){	//if charging current below termination current, stop
+				runtimePars.chargingState = chargingEnd;
+				runtimePars.chargingEndFlag = chargingEnd_termChargingCurrent;	//mark charging current termination limit as end flag
+				restartTick = HAL_GetTick() + (nonVolPars.chgParas.restartChargTime * 1000);	//update restart tick timer
+				__DISABLE_CHG;
+				break;
+			}
+
 			if( nonVolPars.chgParas.packCellCount != 0 ){
 				for( uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){
 					if( LTC6803_getCellVoltage(x) > nonVolPars.chgParas.termCellVolt ){	//if cell voltage above termination voltage, jump directly end/wait state
 						runtimePars.chargingState = chargingEnd;
 						runtimePars.chargingEndFlag = chargingEnd_termCellVoltage0+x;	//mark specific cell's voltage termination limit as end flag
+						restartTick = HAL_GetTick() + (nonVolPars.chgParas.restartChargTime * 1000);	//update restart tick timer
+						__DISABLE_CHG;
 						break;
 					}
 				}
@@ -429,134 +545,348 @@ void chargeControl(void){
 				if( ADC_convertedResults[batteryVoltage] > nonVolPars.chgParas.termPackVolt ){
 					runtimePars.chargingState = chargingEnd;
 					runtimePars.chargingEndFlag = chargingEnd_termPackVoltage;	//mark pack's voltage termination limit as end flag
+					restartTick = HAL_GetTick() + (nonVolPars.chgParas.restartChargTime * 1000);	//update restart tick timer
+					__DISABLE_CHG;
 					break;
 				}
-
-			}
-
-			if( runtimePars.latchedFaults != 0 ){	//before opening charging FETs, check that there aren't faults
-				runtimePars.chargingState = faultState;
-			}
-			else{
-				chargeTick = HAL_GetTick() + 300;
-				auxTick = HAL_GetTick();
-
-				__ENABLE_CHG;
-				runtimePars.charging = 1;
-
-				OCevent = 0;
-				runtimePars.chargingState = startingCurrent;
-			}
-
-		}
-		break;
-
-	case startingCurrent:
-		//monitor the current, allow max 250ms of overcurrent period and stop charging if the current isn't above the termination current limit in 500ms at the end
-		if( (auxTick + 1) <= HAL_GetTick() ){	//check roughly every 1 ms
-			auxTick++;
-
-
-			if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.maxChgCurr ){	//check for overcurrent event
-				OCevent++;
-			}
-
-			if( OCevent > 35 ){	//if overcurrent event has been happening long enough (35ms), terminate charge
-				runtimePars.latchedFaults |= ((uint64_t)1 << fault_highChargingCurrent);
-				runtimePars.faultCount[fault_highChargingCurrent] += 1;
-				runtimePars.chargingState = faultState;
-				chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
-				__DISABLE_CHG;
-				break;
 			}
 
 
-			if( chargeTick <= HAL_GetTick() ){	//if at the end of the starting period the current is below the termination current, go to end-of-charge
-				if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.termCurr ){
-					runtimePars.chargingState = charging;
-				}
-				else{
-					runtimePars.chargingState = chargingEnd;
-					runtimePars.chargingEndFlag = chargingEnd_termChargingCurrent;	//mark charging current termination limit as end flag
-					__DISABLE_CHG;
-				}
-			}
-		}
-		break;
+			break;
 
-	case charging:
-
-		if( 	/*checkMaxCurrentFault() ||*/
-				ADC_convertedResults[chargeCurrent] < nonVolPars.chgParas.termCurr ){	//if charging current below termination current, stop
-			runtimePars.chargingState = chargingEnd;
-			runtimePars.chargingEndFlag = chargingEnd_termChargingCurrent;	//mark charging current termination limit as end flag
+		case chargingEnd:
+			//end of charging,
 			__DISABLE_CHG;
+			runtimePars.charging = 0;
+
+			if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
+				chargeTick = HAL_GetTick() + 250;
+				runtimePars.chargingState = chargerDisconnected;
+			}
+			else if( nonVolPars.chgParas.restartChargTime != 0 && restartTick <= HAL_GetTick() ){	//restart charging if restart time lapsed
+				runtimePars.chargingState = notCharging;
+				runtimePars.chargingEndFlag = chargingEnd_none;
+			}
+			break;
+
+		case chargerDisconnected:
+			runtimePars.chargingEndFlag = chargingEnd_none;
+			if( chargeTick <= HAL_GetTick() ){
+				runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
+				runtimePars.chargingState = notCharging;
+				runtimePars.latchedFaults = 0;
+			}
+			break;
+
+		case faultState:
+			//fault triggered charging stop,
+			__DISABLE_CHG;
+			runtimePars.charging = 0;
+
+			if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
+				chargeTick = HAL_GetTick() + 250;
+				runtimePars.latchedFaults = 0;
+				runtimePars.chargingState = chargerDisconnected;
+			}
+			else if( chargeTick <= HAL_GetTick() ){
+				//wait for the refreshWaitTime to pass and try to start charging again
+				runtimePars.latchedFaults = 0;
+				runtimePars.chargingState = notCharging;
+			}
+			break;
+
+		default:
 			break;
 		}
+	}
+	else{
+		if( runtimePars.chargerConnected == 1 ){
 
-		if( nonVolPars.chgParas.packCellCount != 0 ){
-			for( uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){
-				if( LTC6803_getCellVoltage(x) > nonVolPars.chgParas.termCellVolt ){	//if cell voltage above termination voltage, jump directly end/wait state
+			if( runtimePars.chargingState == notCharging && !!(runtimePars.buck5vRequest & (1 << charging5vRequest)) == 0 ){	//wait for 5V supply to stabilize
+				runtimePars.buck5vRequest |= (1 << charging5vRequest);		//request 5V buck
+				__ENABLE_5V_BUCK;
+				HAL_Delay(25);
+			}
+
+
+			checkChargerVoltageFault();
+			checkBMStemperatureFault();
+			checkNTCtemperatureFault();
+			checkCellVoltageFaults();
+			checkPackVoltageFault();
+
+			if( runtimePars.chargingState == charging ){
+				checkMaxCurrentFault();
+			}
+
+
+			if( runtimePars.chargingState == notCharging && runtimePars.buck5vEnabled == 1){
+				//allow charging to start
+				runtimePars.chargingState = waiting;
+				chargeTick = HAL_GetTick() + 250;
+			}
+
+		}
+		else if( 	runtimePars.chargerConnected == 0 && (runtimePars.chargingState == chargingStarting ||
+				runtimePars.chargingState == waiting)	){
+			runtimePars.chargingState = notCharging;
+			runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
+		}
+
+		//if charging is happening, check if any other BMS unit times out or has faults, if yes, then also fault this unit
+		if( (runtimePars.chargingState == charging) ){
+			for( uint8_t x=0; x<nonVolPars.genParas.parallelPackCount; x++ ){
+				if( ((runtimePars.parPacks[x].lastMessageTick + 250) < HAL_GetTick() || (runtimePars.parPacks[x].bitFields >> 4) == faultState) ){
+					runtimePars.chargingState = faultState;
+					chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
+					runtimePars.faultCount[fault_parallelUnitFault1+x] += 1;
+					runtimePars.latchedFaults |= ((uint64_t)1 << (fault_parallelUnitFault1+x));
+				}
+			}
+		}
+
+		//if faults found on this unit, set state machine to fault wait state
+		if( 	runtimePars.chargingState != notCharging &&
+				runtimePars.chargingState != faultState && runtimePars.latchedFaults != 0 ){
+			runtimePars.chargingState = faultState;
+			chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
+		}
+
+
+		balanceControl();	//control/monitor cell balancing
+
+		switch(runtimePars.chargingState){
+		case notCharging:
+			__DISABLE_CHG;
+			runtimePars.charging = 0;
+			break;
+
+		case waiting:;
+			__DISABLE_CHG;
+
+			//check that all timestamps from other BMS units are not timed out or in a faultstate
+			uint8_t timedOut = 0;
+			uint32_t lowestParPackVoltage = 1000000;
+			for( uint8_t x=0; x<nonVolPars.genParas.parallelPackCount; x++ ){
+				if( (runtimePars.parPacks[x].lastMessageTick + 250) < HAL_GetTick() || (runtimePars.parPacks[x].bitFields >> 4) == faultState  )
+					timedOut++;
+
+				if( runtimePars.parPacks[x].packVoltage < lowestParPackVoltage )	//check if the pack is lowest
+					lowestParPackVoltage = runtimePars.parPacks[x].packVoltage;
+
+			}
+
+			//if comms are not timed out or any other BMS isn't in faultState
+			if( timedOut == 0 ){
+				//check if pack voltage is lowest
+				//calculate current pack voltage
+				uint32_t currentPackVoltage = 0;
+				for(uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){
+					currentPackVoltage += LTC6803_getCellVoltage(x);
+				}
+
+				//if pack is the lowest of all packs with the adjusted voltage based on current, then move onto chargingStarting
+				if( currentPackVoltage < lowestParPackVoltage && lowestParPackVoltage != 1000000 ){
+					runtimePars.chargingState = chargingStarting;
+					chargeTick = HAL_GetTick() + 250;
+				}
+
+			}
+			break;
+
+		case chargingStarting:
+			if( chargeTick <= HAL_GetTick() ){
+
+				//start charging, monitor current and voltages real-time for a couple hundred milliseconds
+				//before enabling charge path, check that cell and pack voltages below termination voltage
+				if( nonVolPars.chgParas.packCellCount != 0 ){
+					for( uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){
+						if( LTC6803_getCellVoltage(x) > nonVolPars.chgParas.termCellVolt ){	//if cell voltage above termination voltage, jump directly end/wait state
+							runtimePars.chargingState = chargingEnd;
+							runtimePars.chargingEndFlag = chargingEnd_termCellVoltage0+x;	//mark specific cell's voltage termination limit as end flag
+							break;
+						}
+					}
+				}
+				else{
+					if( ADC_convertedResults[batteryVoltage] > nonVolPars.chgParas.termPackVolt ){
+						runtimePars.chargingState = chargingEnd;
+						runtimePars.chargingEndFlag = chargingEnd_termPackVoltage;	//mark pack's voltage termination limit as end flag
+						break;
+					}
+
+				}
+
+				if( runtimePars.latchedFaults != 0 ){	//before opening charging FETs, check that there aren't faults
+					runtimePars.chargingState = faultState;
+				}
+				else{
+					chargeTick = HAL_GetTick() + 300;
+					auxTick = HAL_GetTick();
+
+					__ENABLE_CHG;
+					runtimePars.charging = 1;
+
+					OCevent = 0;
+					runtimePars.chargingState = startingCurrent;
+				}
+
+			}
+			break;
+
+		case startingCurrent:
+			//monitor the current, allow max 250ms of overcurrent period and stop charging if the current isn't above the termination current limit in 500ms at the end
+			if( (auxTick + 1) <= HAL_GetTick() ){	//check roughly every 1 ms
+				auxTick++;
+
+
+				if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.maxChgCurr ){	//check for overcurrent event
+					OCevent++;
+				}
+
+				if( OCevent > 35 ){	//if overcurrent event has been happening long enough (35ms), terminate charge
+					runtimePars.latchedFaults |= ((uint64_t)1 << fault_highChargingCurrent);
+					runtimePars.faultCount[fault_highChargingCurrent] += 1;
+					runtimePars.chargingState = faultState;
+					chargeTick = HAL_GetTick() + ( nonVolPars.chgParas.refreshWaitTime * 1000 );
+					__DISABLE_CHG;
+					break;
+				}
+
+
+				if( chargeTick <= HAL_GetTick() ){	//if at the end of the starting period the current is below the termination current, go to end-of-charge
+					if( ADC_convertedResults[chargeCurrent] > nonVolPars.chgParas.termCurr ){
+						runtimePars.chargingState = charging;
+					}
+					else{
+						runtimePars.chargingState = chargingEnd;
+						runtimePars.chargingEndFlag = chargingEnd_termChargingCurrent;	//mark charging current termination limit as end flag
+						__DISABLE_CHG;
+					}
+				}
+			}
+			break;
+
+		case charging:
+
+			if(	ADC_convertedResults[chargeCurrent] < nonVolPars.chgParas.termCurr ){	//if charging current below termination current, stop
+				runtimePars.chargingState = chargingEnd;
+				runtimePars.chargingEndFlag = chargingEnd_termChargingCurrent;	//mark charging current termination limit as end flag
+				__DISABLE_CHG;
+				break;
+			}
+
+			if( nonVolPars.chgParas.packCellCount != 0 ){
+				for( uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){
+					if( LTC6803_getCellVoltage(x) > nonVolPars.chgParas.termCellVolt ){	//if cell voltage above termination voltage, jump directly end/wait state
+						runtimePars.chargingState = chargingEnd;
+						runtimePars.chargingEndFlag = chargingEnd_termCellVoltage0+x;	//mark specific cell's voltage termination limit as end flag
+						__DISABLE_CHG;
+						break;
+					}
+				}
+			}
+			else{
+				if( ADC_convertedResults[batteryVoltage] > nonVolPars.chgParas.termPackVolt ){
 					runtimePars.chargingState = chargingEnd;
-					runtimePars.chargingEndFlag = chargingEnd_termCellVoltage0+x;	//mark specific cell's voltage termination limit as end flag
+					runtimePars.chargingEndFlag = chargingEnd_termPackVoltage;	//mark pack's voltage termination limit as end flag
 					__DISABLE_CHG;
 					break;
 				}
 			}
-		}
-		else{
-			if( ADC_convertedResults[batteryVoltage] > nonVolPars.chgParas.termPackVolt ){
-				runtimePars.chargingState = chargingEnd;
-				runtimePars.chargingEndFlag = chargingEnd_termPackVoltage;	//mark pack's voltage termination limit as end flag
-				__DISABLE_CHG;
-				break;
+
+
+			break;
+
+		case chargingEnd:
+			//end of charging,
+			__DISABLE_CHG;
+			runtimePars.charging = 0;
+
+			if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
+				chargeTick = HAL_GetTick() + 250;
+				runtimePars.chargingState = chargerDisconnected;
 			}
+			break;
+
+		case chargerDisconnected:
+			runtimePars.chargingEndFlag = chargingEnd_none;
+			if( chargeTick <= HAL_GetTick() ){
+				runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
+				runtimePars.chargingState = notCharging;
+				runtimePars.latchedFaults = 0;
+			}
+			break;
+
+		case faultState:
+			//fault triggered charging stop,
+			__DISABLE_CHG;
+			runtimePars.charging = 0;
+
+			if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
+				chargeTick = HAL_GetTick() + 250;
+				runtimePars.latchedFaults = 0;
+				runtimePars.chargingState = chargerDisconnected;
+			}
+			else if( chargeTick <= HAL_GetTick() ){
+				//wait for the refreshWaitTime to pass and try to start charging again
+				runtimePars.latchedFaults = 0;
+				runtimePars.chargingState = notCharging;
+			}
+			break;
+
+		default:
+			break;
 		}
-
-
-		break;
-
-	case chargingEnd:
-		//end of charging,
-		__DISABLE_CHG;
-		runtimePars.charging = 0;
-
-		if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
-			chargeTick = HAL_GetTick() + 250;
-			runtimePars.chargingState = chargerDisconnected;
-		}
-		break;
-
-	case chargerDisconnected:
-		runtimePars.chargingEndFlag = chargingEnd_none;
-		if( chargeTick <= HAL_GetTick() ){
-			runtimePars.buck5vRequest &= ~(1 << charging5vRequest);
-			runtimePars.chargingState = notCharging;
-			runtimePars.latchedFaults = 0;
-		}
-		break;
-
-	case faultState:
-		//fault triggered charging stop,
-		__DISABLE_CHG;
-		runtimePars.charging = 0;
-
-		if( runtimePars.chargerConnected == 0 ){	//check if charger disconnected
-			chargeTick = HAL_GetTick() + 250;
-			runtimePars.latchedFaults = 0;
-			runtimePars.chargingState = chargerDisconnected;
-		}
-		else if( chargeTick <= HAL_GetTick() ){
-			//wait for the refreshWaitTime to pass and try to start charging again
-			runtimePars.latchedFaults = 0;
-			runtimePars.chargingState = notCharging;
-		}
-		break;
-
-	default:
-		break;
 	}
 
+
+}
+
+void sendHeartBeat(void){
+	static uint64_t heartbeatTick = 0;
+
+	if( runtimePars.chargerConnected == 0 )	//if no charger detected or other future flag info, then don't send heartbeat
+		return;
+
+
+	if( nonVolPars.genParas.parallelPackCount != 0 && heartbeatTick <= HAL_GetTick() ){	//if charger detected, send heartbeat messages on CAN-bus
+
+		heartbeatTick = HAL_GetTick() + 150;
+
+		if( runtimePars.buck5vEnabled == 1 ){	//check that 5V rail is powered -> CAN transceiver is powered
+			//send heartBeat message on CAN-bus for "parallel pack(s)"-mode
+			//assemble can-frame and send it to TXbuffer
+			uint32_t packVoltage = 0;
+			uint16_t chargingCurrent = 0;
+			uint8_t bitFields = 0, frameData[8] = {0};
+
+			for(uint8_t x=0; x<nonVolPars.chgParas.packCellCount; x++){	//sum up all the cell voltages
+				packVoltage += LTC6803_getCellVoltage(x);
+			}
+
+			packVoltage = packVoltage - (packVoltage * (float)(nonVolPars.genParas.currentVoltageRatio / 1000));
+
+			chargingCurrent = ADC_convertedResults[chargeCurrent];
+
+			bitFields = (runtimePars.chargingState << 4) | ((runtimePars.latchedFaults ? 1:0) << 3) | (runtimePars.balancing << 2);
+
+			if( ADC_convertedResults[chargeCurrent] < nonVolPars.chgParas.termCurr )
+				bitFields |= (1 << 1);
+
+
+			frameData[0] = (packVoltage >> 16);
+			frameData[1] = (packVoltage >> 8);
+			frameData[2] = (packVoltage);
+			frameData[3] = (chargingCurrent >> 8);
+			frameData[4] = (chargingCurrent);
+			frameData[5] = (bitFields);
+
+			uint32_t ID = (COMM_BMS_HEARTBEAT << 8) | nonVolPars.genParas.canID;
+
+			CAN1_transmit(ID, frameData, 6);
+		}
+	}
 
 }
 
@@ -759,7 +1089,7 @@ void statusLed(void){
 
 			while(1){
 
-				switch( ((state + stateChanges) % 7) ){
+				switch( ((state + stateChanges) % 8) ){
 				case 0:
 					if(runtimePars.usbConnected == 1){	//usb-connected
 						state = 1;
@@ -796,7 +1126,7 @@ void statusLed(void){
 						if(runtimePars.faultCount[x] != 0)
 							faultsFound = 1;
 					}
-					if(faultsFound == 1){
+					if(faultsFound == 1 && runtimePars.chargingState != 0){
 						state = 6;
 						stateSelected = 1;
 					}
@@ -804,6 +1134,12 @@ void statusLed(void){
 				case 6:
 					if(runtimePars.balancing != 0 && runtimePars.storageDischarged == 0){	//storage discharging
 						state = 7;
+						stateSelected = 1;
+					}
+					break;
+				case 7:
+					if(runtimePars.chargingState == waiting){	//storage discharging
+						state = 8;
 						stateSelected = 1;
 					}
 					break;
@@ -817,7 +1153,7 @@ void statusLed(void){
 
 
 				stateChanges++;
-				if(stateChanges == 7){
+				if(stateChanges == 8){
 					state = 0;
 					break;
 				}
@@ -875,6 +1211,19 @@ void statusLed(void){
 				__GREEN_LED_ON;
 				__BLUE_LED_ON;
 				break;
+			case 8: //chargingState waiting
+				if( (animationState % 10) < 5 ){
+					__RED_LED_OFF;
+					__GREEN_LED_OFF;
+					__BLUE_LED_OFF;
+				}
+				else{
+					__RED_LED_ON;
+					__GREEN_LED_ON;
+					__BLUE_LED_OFF;
+				}
+				animationState++;
+				break;
 		}
 
 	}
@@ -891,14 +1240,14 @@ void updateActiveTimer(void){
 	if( runtimePars.activeTick <= HAL_GetTick() && runtimePars.storageDischarged == 1 ){
 		runtimePars.activeTimerState = 0;	//active time window passed
 
-		if( nonVolPars.genParas.duringActive5vOn == 1 ){	//if duringActive5vOn enabled, clear 5V request
+		if( nonVolPars.genParas.duringStandby5vOn == 1 ){	//if duringStandby5vOn enabled, clear 5V request
 			runtimePars.buck5vRequest &= ~(1 << active5vRequest);
 		}
 	}
 	else{
 		runtimePars.activeTimerState = 1;	//active time window not-passed
 
-		if( nonVolPars.genParas.duringActive5vOn == 1 ){	//if duringActive5vOn enabled, set 5V request
+		if( nonVolPars.genParas.duringStandby5vOn == 1 ){	//if duringStandby5vOn enabled, set 5V request
 			runtimePars.buck5vRequest |= (1 << active5vRequest);
 		}
 	}

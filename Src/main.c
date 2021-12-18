@@ -78,14 +78,12 @@ int main(void)
 
 		}
 
-
-		//CAN1_process_message();
-
 		saveNonVolatileParameters(&nonVolPars, 0);
 
 		hwRequestControl();		//disable/enable 5V buck and ADC channels based on software requests
 
 		detectCharger();
+		sendHeartBeat();
 		chargeControl();	//charging algorithm, everything charging control related is done through here
 
 		USB_checkForNewMessages();		//check for new messages from USB and send State printout if enabled

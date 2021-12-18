@@ -49,6 +49,7 @@ extern "C" {
 #define __RED_LED_OFF ( GPIOB->BSRR |= (1 << 13) )
 
 #define __TIME_HOUR_TICKS ( 3600000 )
+#define __TIME_MINUTES_TICKS ( 60000 )
 
 #include "stm32l4xx_hal.h"
 
@@ -98,6 +99,10 @@ typedef enum
 	fault_highBMStemp,
 	fault_lowNTCtemp,
 	fault_highNTCtemp,
+	fault_heartbeatTimeout,
+	fault_parallelUnitFault1,
+	fault_parallelUnitFault2,
+	fault_parallelUnitFault3,
 	fault_numberOfElements
 }_fault_ID;
 
@@ -141,7 +146,8 @@ enum
 	charging,
 	chargingEnd,
 	chargerDisconnected,
-	faultState
+	faultState,
+	waiting
 }_chargingState_ID;
 
 typedef struct __attribute__((packed)) _chargingParameters {
@@ -169,6 +175,8 @@ typedef struct __attribute__((packed)) _chargingParameters {
 	uint16_t maxBMStemp;		//K (Kelvin), PCB temperature, the maximum temperature below which charging is allowed
 
 	uint16_t refreshWaitTime;	//s (seconds), wait time
+	uint16_t restartChargTime;	//s (seconds), how much time to wait before attempting to restart charging from a non-fault charging end
+
 } chargingParameters;
 
 typedef struct __attribute__((packed)) _ADCparameters {
@@ -182,15 +190,17 @@ typedef struct __attribute__((packed)) _generalParameters {
 	uint16_t stayActiveTime;	//h (Hours), how long to stay in active mode
 	uint8_t alwaysBalancing;	//1 or 0, allow balancing even when not charging
 	uint8_t always5vRequest;	//1 or 0, force 5V buck always on
-	uint8_t duringActive5vOn;	//1 or 0, whether to keep 5V regulator on during active time, even if USB, charger or Opto not active
+	uint8_t duringStandby5vOn;	//1 or 0, whether to keep 5V regulator on during active time, even if USB, charger or Opto not active
 
 	uint16_t storageCellVoltage;	//mV (milliVolts), what voltage to discharge cells if storage voltage discharge enabled
 	uint16_t timeToStorageDischarge;	//h (hours), how long to wait after active state to start discharging cells to storage voltage
 
 	uint8_t canActivityTick;	//1 or 0, ticks the status led in magenta when can packets are received
 	uint8_t canID;				//canID that the BMS uses to recognize as itself
-	uint16_t canRxRefreshActive;	//h (hours),Receiving CAN messages refresh activeTimer up to this length, 0 to disable
+	uint16_t canRxRefreshActive;	//min (minutes),Receiving CAN messages refresh activeTimer up to this length, 0 to disable
 	uint8_t canWakeUp;			//1 or 0, allows or disallows CAN activity to wake-up BMS from sleep, increases quiescent current somewhat
+	uint8_t parallelPackCount;	//how many parallel packs there is alongside this BMS, 0 to disable
+	uint8_t currentVoltageRatio;		//used as a scaling factor to improve the behavior of parallel pack's joining into the charging session based on the charging curren
 } generalParameters;
 
 typedef struct __attribute__((packed)) _nonVolParameters {
@@ -199,6 +209,14 @@ typedef struct __attribute__((packed)) _nonVolParameters {
 	ADCparameters adcParas;
 	generalParameters genParas;
 } nonVolParameters;
+
+typedef struct _parallelPackInfo {
+	uint8_t parPackCanId;	//parallel pack's CAN ID
+	uint32_t packVoltage;	//parallel pack's reported pack voltage (10 mV LSB)
+	uint16_t chargingCurrent;	//parallel pack's reported charging current (10 mA LSB)
+	uint64_t lastMessageTick;	//system tick timestamp when the last heartbeat message received, used for timeout detection
+	uint8_t bitFields;		//fault, current under termination limit, termination voltage hit, charging state
+}parallelPackInfo;
 
 typedef struct _runtimeParameters {
 	uint16_t statePrintout;
@@ -230,6 +248,8 @@ typedef struct _runtimeParameters {
 
 	uint64_t activeTick;
 	uint64_t storageTick;
+
+	parallelPackInfo parPacks[3];
 
 } runtimeParameters;
 

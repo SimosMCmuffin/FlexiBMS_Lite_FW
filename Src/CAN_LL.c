@@ -227,6 +227,14 @@ void CAN1_setupRxFilters(){
 	//CAN1->sFilterRegister[0].FR2 = 0;	//set ALL mask bits to DO_NOT_CARE, meaning all messages will be read into RX FIFO
 	CAN1->sFilterRegister[0].FR2 = 0 | (0xFF << 3) | (1 << 2);	//set mask bits as "care" for first 8 bits of extended ID and that the frame is using extended ID
 
+	//parallel mode CAN RX filter setup
+	//allow other CAN IDs to be received, if they have the COMM_PACKET_ID-field (from datatypes.h) set to COMM_BMS_HEARTBEAT
+	if(nonVolPars.genParas.parallelPackCount != 0){
+		CAN1->FA1R |= (1 << 1);
+		CAN1->sFilterRegister[0].FR1 = 0 | (COMM_BMS_HEARTBEAT << 11) | (1 << 2);	//accept any can frame with the COMM_BMS_HEARTBEAT command
+		CAN1->sFilterRegister[0].FR2 = 0 | (0xFF << 11) | (1 << 2);
+	}
+
 	CAN1->FMR = 0;		//filter active mode
 }
 
@@ -364,7 +372,20 @@ void CAN1_process_message() {
 	uint8_t controller_id = id & 0xFF;
 	CAN_PACKET_ID cmd = id >> 8;
 
-	if (controller_id != nonVolPars.genParas.canID)
+	//COMM_BMS_HEARTBEAT message handling
+	if(nonVolPars.genParas.parallelPackCount != 0 && (id >> 8) == COMM_BMS_HEARTBEAT){
+		for(uint8_t x=0; x<nonVolPars.genParas.parallelPackCount; x++){	//scan sender IDs to match the correct parallel pack info array
+			if(runtimePars.parPacks[x].parPackCanId == controller_id){	//unpack info
+				runtimePars.parPacks[x].lastMessageTick = HAL_GetTick();
+				runtimePars.parPacks[x].bitFields = data[5];
+				runtimePars.parPacks[x].chargingCurrent = (data[3] << 8) | data[4];
+				runtimePars.parPacks[x].packVoltage = (data[0] << 16) | (data[1] << 8) | data[2];
+
+				return;	//if CAN ID matched, then break out of loop
+			}
+		}
+	}
+	else if (controller_id != nonVolPars.genParas.canID)
 		return;
 
 	int ind = 0;
@@ -509,8 +530,8 @@ void CAN1_RX0_IRQHandler(void){
 
 		//CAN RX activeTimer refresh
 		if( nonVolPars.genParas.canRxRefreshActive != 0 ){	//check if parameter is enabled, before going into a bigger if-statement
-			if( (runtimePars.activeTick - (nonVolPars.genParas.canRxRefreshActive * __TIME_HOUR_TICKS)) <= HAL_GetTick() ){
-				runtimePars.activeTick = HAL_GetTick() + (nonVolPars.genParas.canRxRefreshActive * __TIME_HOUR_TICKS);
+			if( (runtimePars.activeTick - (nonVolPars.genParas.canRxRefreshActive * __TIME_MINUTES_TICKS)) <= HAL_GetTick() ){
+				runtimePars.activeTick = HAL_GetTick() + (nonVolPars.genParas.canRxRefreshActive * __TIME_MINUTES_TICKS);
 			}
 		}
 

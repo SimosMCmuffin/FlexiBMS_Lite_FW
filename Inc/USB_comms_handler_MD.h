@@ -66,9 +66,13 @@ typedef enum
 	canActivityTick,
 	canID,
 
-	duringActive5vOn,
+	duringStandby5vOn,
 	canRxRefreshActive,
 	canWakeUp,
+	parallelPackCount,
+	currentVoltageRatio,
+
+	restartChargTime,
 
 	numberOfElements
 }_parameter_ID;

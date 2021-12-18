@@ -58,6 +58,33 @@ void ADC_init(void){
 		temp30Cvoltage = TS_CAL1 * (3000.0 / 4095.0);
 		intTempStep = (TS_CAL2 - TS_CAL1) * (3000.0 / 4095.0) / 100;	//calculate the voltage difference for 1C step
 
+		//check HW version and load necessary multipliers related to HW changes
+		uint8_t string[8];
+		uint8_t pos = 0;
+		uint8_t* memoryLocation = (uint8_t*)0x1FFF7000;
+
+		for(uint8_t x=0; x<8; x++){
+			string[pos] = memoryLocation[x];
+			pos += 1;
+		}
+
+		if( string[3] == '0' && string[4] == '.' && string[5] == '5' ){
+			HWmult[0] = 1.0;
+			HWmult[1] = 1.0;
+			HWmult[2] = 1.0;
+		}
+		else if( string[3] == '1' && string[4] == '.' && string[5] == '0' ){
+			HWmult[0] = 1.0;
+			HWmult[1] = 1.0;
+			HWmult[2] = 1.666;
+		}
+		else{
+			HWmult[0] = 1.0;
+			HWmult[1] = 1.0;
+			HWmult[2] = 1.0;
+		}
+
+
 		ADC1->CR |= (1 << 0);			//enable ADC1
 
 		ADC_initialized = 1;		//mark ADC as initialized
@@ -88,7 +115,8 @@ void convertADCresults(void){
 
 	//battery voltage, mV
 	ADC_convertedResults[batteryVoltage] =
-			( ADC_results[batteryVoltage] * LSBres * (114.7/4.7) * nonVolPars.adcParas.ADC_chan_gain[batteryVoltage] ) + nonVolPars.adcParas.ADC_chan_offset[batteryVoltage];
+			( ADC_results[batteryVoltage] * LSBres * (114.7/4.7) * nonVolPars.adcParas.ADC_chan_gain[batteryVoltage] * HWmult[0] )
+			+ nonVolPars.adcParas.ADC_chan_offset[batteryVoltage];
 	if(ADC_convertedResults[batteryVoltage] < ADC_HighMin[batteryVoltage][0])	//check if result lower than the earlier MIN value
 		ADC_HighMin[batteryVoltage][0] = ADC_convertedResults[batteryVoltage];
 	if(ADC_convertedResults[batteryVoltage] > ADC_HighMin[batteryVoltage][1])	//check if result higher than the earlier MAX value
@@ -96,7 +124,8 @@ void convertADCresults(void){
 
 	//charger voltage, mV
 	ADC_convertedResults[chargerVoltage] =
-			( ADC_results[chargerVoltage] * LSBres * (117.2/4.7) * nonVolPars.adcParas.ADC_chan_gain[chargerVoltage] ) + nonVolPars.adcParas.ADC_chan_offset[chargerVoltage];
+			( ADC_results[chargerVoltage] * LSBres * (117.2/4.7) * nonVolPars.adcParas.ADC_chan_gain[chargerVoltage] * HWmult[1] )
+			+ nonVolPars.adcParas.ADC_chan_offset[chargerVoltage];
 	if(ADC_convertedResults[chargerVoltage] < ADC_HighMin[chargerVoltage][0])	//check if result lower than the earlier MIN value
 		ADC_HighMin[chargerVoltage][0] = ADC_convertedResults[chargerVoltage];
 	if(ADC_convertedResults[chargerVoltage] > ADC_HighMin[chargerVoltage][1])	//check if result higher than the earlier MAX value
@@ -104,7 +133,8 @@ void convertADCresults(void){
 
 	//current sense, mA
 	ADC_convertedResults[chargeCurrent] =
-			( ADC_results[chargeCurrent] * LSBres * 4 * nonVolPars.adcParas.ADC_chan_gain[chargeCurrent] ) + nonVolPars.adcParas.ADC_chan_offset[chargeCurrent];
+			( ADC_results[chargeCurrent] * LSBres * 4 * nonVolPars.adcParas.ADC_chan_gain[chargeCurrent] * HWmult[2] )
+			+ nonVolPars.adcParas.ADC_chan_offset[chargeCurrent];
 	if(ADC_convertedResults[chargeCurrent] < ADC_HighMin[chargeCurrent][0])	//check if result lower than the earlier MIN value
 		ADC_HighMin[chargeCurrent][0] = ADC_convertedResults[chargeCurrent];
 	if(ADC_convertedResults[chargeCurrent] > ADC_HighMin[chargeCurrent][1])	//check if result higher than the earlier MAX value

@@ -261,14 +261,23 @@ void set_parameter(float* value, _parameter_ID parameterID){
 	case canID:
 		nonVolPars.genParas.canID = (uint8_t)*value;
 		break;
-	case duringActive5vOn:
-		nonVolPars.genParas.duringActive5vOn = (uint8_t)*value;
+	case duringStandby5vOn:
+		nonVolPars.genParas.duringStandby5vOn = (uint8_t)*value;
 		break;
 	case canRxRefreshActive:
 		nonVolPars.genParas.canRxRefreshActive = (uint16_t)*value;
 		break;
 	case canWakeUp:
 		nonVolPars.genParas.canWakeUp = (uint8_t)*value;
+		break;
+	case parallelPackCount:
+		nonVolPars.genParas.parallelPackCount = (uint8_t)*value;
+		break;
+	case currentVoltageRatio:
+		nonVolPars.genParas.currentVoltageRatio = (uint8_t)*value;
+		break;
+	case restartChargTime:
+		nonVolPars.chgParas.restartChargTime = (uint16_t)*value;
 		break;
 	default:
 		report_error(error_invalidMessageID);
@@ -569,7 +578,7 @@ void report_load(uint16_t status){
 }
 
 void report_parameters(_parameter_ID parameter, uint8_t reportAll){
-	uint8_t text[1024] = {};
+	uint8_t text[8192] = {};
 	uint16_t pos = 0;
 
 	static const uint8_t Ftext1[] = {"\r\n"};
@@ -586,7 +595,7 @@ void report_parameters(_parameter_ID parameter, uint8_t reportAll){
 		if( reportAll == 0)
 			break;
 
-		if( pos > 512){
+		if( pos > 7000){
 			while( CDC_Transmit_FS(text, pos) );
 			pos = 0;
 		}
@@ -791,20 +800,35 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		static const uint8_t description38[] = {" (CAN ID number for this BMS unit, if using multi-BMS setups, all BMS' need to have unique CAN ID, uint16_t)\r\n"};
 		appendString(text, description38, pos);
 		break;
-	case duringActive5vOn:
-		appendUint16(text, nonVolPars.genParas.duringActive5vOn, pos);
+	case duringStandby5vOn:
+		appendUint16(text, nonVolPars.genParas.duringStandby5vOn, pos);
 		static const uint8_t description39[] = {" (0/1, if set to 1, keeps 5V regulator on if activeTimer is not expired even if USB, charger or Opto not active, Boolean)\r\n"};
 		appendString(text, description39, pos);
 		break;
 	case canRxRefreshActive:
 		appendUint16(text, nonVolPars.genParas.canRxRefreshActive, pos);
-		static const uint8_t description40[] = {" (h (Hours), up to how many hours a CAN-frame reception can extend activeTimer, set to 0 to disable, uint16_t)\r\n"};
+		static const uint8_t description40[] = {" (Min (minutes), up to how many minutes a CAN-frame reception can extend activeTimer, set to 0 to disable, uint16_t)\r\n"};
 		appendString(text, description40, pos);
 		break;
 	case canWakeUp:
 		appendUint16(text, nonVolPars.genParas.canWakeUp, pos);
 		static const uint8_t description41[] = {" (1 or 0, can be used to allow CAN activity to wake-up the BMS from sleep, increases sleep mode quiescent current slightly, set to 0 to disable, boolean)\r\n"};
 		appendString(text, description41, pos);
+		break;
+	case parallelPackCount:
+		appendUint16(text, nonVolPars.genParas.parallelPackCount, pos);
+		static const uint8_t description42[] = {" (0-3, how many parallel packs there are in addition to this unit, set to 0 to disable, uint8_t)\r\n"};
+		appendString(text, description42, pos);
+		break;
+	case currentVoltageRatio:
+		appendUint16(text, nonVolPars.genParas.currentVoltageRatio, pos);
+		static const uint8_t description43[] = {" (0-255, current voltage ratio for parallel packs starting charging, set to 0 for no scaling, uint8_t)\r\n"};
+		appendString(text, description43, pos);
+		break;
+	case restartChargTime:
+		appendUint16(text, nonVolPars.chgParas.restartChargTime, pos);
+		static const uint8_t description44[] = {" (s (seconds), how much time to wait before attempting to restart charging from a non-fault charging end, set to 0 to disable, uint16_t)\r\n"};
+		appendString(text, description44, pos);
 		break;
 	default:;
 		static const uint8_t description33[] = {" (parameter error)\r\n"};
@@ -845,6 +869,10 @@ void appendChargingState(uint8_t* text, uint16_t state, uint16_t* pos){
 		static const uint8_t description5[] = {"faultState:"};
 		appendString(text, description5, pos);
 		break;
+	case waiting:;
+		static const uint8_t description7[] = {"waiting:"};
+		appendString(text, description7, pos);
+		break;
 	default:
 		break;
 	}
@@ -856,7 +884,7 @@ void appendChargingEndFlag(uint8_t* text, uint16_t flag, uint16_t* pos){
 	if( flag >= chargingEnd_termCellVoltage0 && flag <= chargingEnd_termCellVoltage11 ){
 		static const uint8_t description0[] = {"cell"};
 		appendString(text, description0, pos);
-		appendUint16(text, (flag-2), pos);
+		appendUint16(text, (flag-1), pos);
 		static const uint8_t description1[] = {"TermVoltage:"};
 		appendString(text, description1, pos);
 	}

@@ -82,7 +82,7 @@ USBD_CDC_LineCodingTypeDef LineCoding = {
 /* Define size for the receive and transmit buffer over CDC */
 /* It's up to user to redefine and/or remove those define */
 #define APP_RX_DATA_SIZE  64
-#define APP_TX_DATA_SIZE  1024
+#define APP_TX_DATA_SIZE  8192
 /* USER CODE END PRIVATE_DEFINES */
 /**
   * @}
@@ -101,7 +101,7 @@ USBD_CDC_LineCodingTypeDef LineCoding = {
 uint8_t UserTxBufferFS[APP_TX_DATA_SIZE];
 
 
-#define  MaxCommandsInBuffer 10 //max 10 commands can be received and saved without overwriting. Each command has a max size of APP_RX_DATA_SIZE
+#define  MaxCommandsInBuffer 1 //max 10 commands can be received and saved without overwriting. Each command has a max size of APP_RX_DATA_SIZE
 
 static struct
 {

@@ -165,9 +165,12 @@ void commands_process_packet(uint8_t from, uint8_t *data, unsigned int len,
 		nonVolPars.genParas.timeToStorageDischarge = buffer_get_uint16(data, &ind);
 		nonVolPars.genParas.canActivityTick = data[ind++];
 		nonVolPars.genParas.canID = data[ind++];
-		nonVolPars.genParas.duringActive5vOn = data[ind++];
+		nonVolPars.genParas.duringStandby5vOn = data[ind++];
 		nonVolPars.genParas.canRxRefreshActive = buffer_get_uint16(data, &ind);
 		nonVolPars.genParas.canWakeUp = data[ind++];
+		nonVolPars.genParas.parallelPackCount = data[ind++];
+		nonVolPars.genParas.currentVoltageRatio = data[ind++];
+		nonVolPars.chgParas.restartChargTime = buffer_get_uint16(data, &ind);
 		ind = 0;
 		send_buffer[ind++] = packet_id;
 		send_buffer[ind++] = nonVolPars.genParas.canID;
@@ -209,9 +212,12 @@ void commands_process_packet(uint8_t from, uint8_t *data, unsigned int len,
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.timeToStorageDischarge, &ind);
 		send_buffer[ind++] = nonVolPars.genParas.canActivityTick;
 		send_buffer[ind++] = nonVolPars.genParas.canID;
-		send_buffer[ind++] = nonVolPars.genParas.duringActive5vOn;
+		send_buffer[ind++] = nonVolPars.genParas.duringStandby5vOn;
 		buffer_append_uint16(send_buffer, nonVolPars.genParas.canRxRefreshActive, &ind);
 		send_buffer[ind++] = nonVolPars.genParas.canWakeUp;
+		send_buffer[ind++] = nonVolPars.genParas.parallelPackCount;
+		send_buffer[ind++] = nonVolPars.genParas.currentVoltageRatio;
+		buffer_append_uint16(send_buffer, nonVolPars.chgParas.restartChargTime, &ind);
 		commands_send_packet(from, send_buffer, ind);
 		break;
 	case COMM_STORE_BMS_CONF:

@@ -40,7 +40,7 @@ typedef enum
 
 volatile uint16_t ADC_results[5], ADC_convertedResults[5], ADC_HighMin[3][2], ADC_conversionIndex, ADC_initialized;
 volatile uint16_t TS_CAL1, TS_CAL2;
-float intTempStep, temp30Cvoltage;
+float intTempStep, temp30Cvoltage, HWmult[3];
 
 void ADC_init(void);
 void ADC_deInit(void);

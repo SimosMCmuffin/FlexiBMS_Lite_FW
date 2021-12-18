@@ -28,6 +28,7 @@ uint16_t highestCell(uint8_t);
 uint16_t lowestCell(uint8_t);
 uint8_t usbPowerPresent(void);
 void chargeControl(void);
+void sendHeartBeat(void);
 void detectCharger(void);
 void balanceControl(void);
 void hwRequestControl(void);
