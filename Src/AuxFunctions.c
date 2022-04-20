@@ -393,7 +393,7 @@ void chargeControl(void){
 	static uint64_t chargeTick = 0, auxTick = 0, restartTick = 0;
 	static uint16_t OCevent = 0;
 
-	if(nonVolPars.genParas.parallelPackCount == 0){
+	if(nonVolPars.genParas.parallelPackCount == 0){	//normal operation mode, without any parallel packs
 		//check if charger detected
 		if( runtimePars.chargerConnected == 1 ){
 
@@ -600,7 +600,7 @@ void chargeControl(void){
 		}
 	}
 	else{
-		if( runtimePars.chargerConnected == 1 ){
+		if( runtimePars.chargerConnected == 1 ){	//parallel pack charging mode
 
 			if( runtimePars.chargingState == notCharging && !!(runtimePars.buck5vRequest & (1 << charging5vRequest)) == 0 ){	//wait for 5V supply to stabilize
 				runtimePars.buck5vRequest |= (1 << charging5vRequest);		//request 5V buck
@@ -664,7 +664,7 @@ void chargeControl(void){
 		case waiting:;
 			__DISABLE_CHG;
 
-			//check that all timestamps from other BMS units are not timed out or in a faultstate
+			//check that all timestamps from other BMS units are not timed out or they're in a faultstate
 			uint8_t timedOut = 0;
 			uint32_t lowestParPackVoltage = 1000000;
 			for( uint8_t x=0; x<nonVolPars.genParas.parallelPackCount; x++ ){

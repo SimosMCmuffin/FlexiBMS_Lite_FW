@@ -797,7 +797,7 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		break;
 	case canID:
 		appendUint16(text, nonVolPars.genParas.canID, pos);
-		static const uint8_t description38[] = {" (CAN ID number for this BMS unit, if using multi-BMS setups, all BMS' need to have unique CAN ID, uint16_t)\r\n"};
+		static const uint8_t description38[] = {" (CAN ID number for this BMS unit, if using multi-BMS setups, all BMS' need to have unique CAN ID, uint)\r\n"};
 		appendString(text, description38, pos);
 		break;
 	case duringStandby5vOn:
@@ -807,7 +807,7 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		break;
 	case canRxRefreshActive:
 		appendUint16(text, nonVolPars.genParas.canRxRefreshActive, pos);
-		static const uint8_t description40[] = {" (Min (minutes), up to how many minutes a CAN-frame reception can extend activeTimer, set to 0 to disable, uint16_t)\r\n"};
+		static const uint8_t description40[] = {" (Min (minutes), up to how many minutes a CAN-frame reception can extend activeTimer, set to 0 to disable, uint)\r\n"};
 		appendString(text, description40, pos);
 		break;
 	case canWakeUp:
@@ -817,17 +817,17 @@ void appendParameter(uint8_t* text, uint16_t indexNo, uint16_t* pos){
 		break;
 	case parallelPackCount:
 		appendUint16(text, nonVolPars.genParas.parallelPackCount, pos);
-		static const uint8_t description42[] = {" (0-3, how many parallel packs there are in addition to this unit, set to 0 to disable, uint8_t)\r\n"};
+		static const uint8_t description42[] = {" (0-3, how many parallel packs there are in addition to this unit, set to 0 to disable, uint)\r\n"};
 		appendString(text, description42, pos);
 		break;
 	case currentVoltageRatio:
 		appendUint16(text, nonVolPars.genParas.currentVoltageRatio, pos);
-		static const uint8_t description43[] = {" (0-255, current voltage ratio for parallel packs starting charging, set to 0 for no scaling, uint8_t)\r\n"};
+		static const uint8_t description43[] = {" (0-255, current voltage ratio for parallel packs starting charging, set to 0 for no scaling/compensation, uint)\r\n"};
 		appendString(text, description43, pos);
 		break;
 	case restartChargTime:
 		appendUint16(text, nonVolPars.chgParas.restartChargTime, pos);
-		static const uint8_t description44[] = {" (s (seconds), how much time to wait before attempting to restart charging from a non-fault charging end, set to 0 to disable, uint16_t)\r\n"};
+		static const uint8_t description44[] = {" (s (seconds), how much time to wait before attempting to restart charging from a non-fault charging end, set to 0 to disable, uint)\r\n"};
 		appendString(text, description44, pos);
 		break;
 	default:;
