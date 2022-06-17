@@ -32,7 +32,7 @@
 #include "stm32l4xx_hal.h"
 #include "usbd_def.h"
 
- USBD_HandleTypeDef hUsbDeviceFS;
+extern USBD_HandleTypeDef hUsbDeviceFS;
 /* USER CODE BEGIN INCLUDE */
 
 /* USER CODE END INCLUDE */

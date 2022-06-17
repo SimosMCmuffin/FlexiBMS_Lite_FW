@@ -41,6 +41,8 @@ struct txBuffer_struct{
 static struct txBuffer_struct txBuffer[TX_BUFFER_SIZE];
 static uint8_t queueIndex = 0, txIndex = 0, ISR_running = 0;
 
+uint16_t CAN_initialized;
+
 extern nonVolParameters nonVolPars;
 extern runtimeParameters runtimePars;
 

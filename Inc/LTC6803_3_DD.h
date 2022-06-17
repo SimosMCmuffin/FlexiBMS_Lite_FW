@@ -22,7 +22,7 @@
 
 #include <stdint.h>
 
-struct LTC6803_3{
+typedef struct LTC_data_t {
 	uint8_t CFGR[6];				//LTC6803 configuration values
 	uint8_t Cells[18];				//raw LTC6803 cell measurement results
 	uint16_t cVoltages[12];			//mV, normal cell voltages
@@ -31,9 +31,7 @@ struct LTC6803_3{
 	uint16_t internalTemperature;	//Kelvin, internal temperature
 	uint8_t DIAG[2];
 	uint8_t PEC;
-} LTC_data;
-
-uint8_t SPI_message, SPI_index;
+} LTC_data_t;
 
 void LTC6803_init(void);
 

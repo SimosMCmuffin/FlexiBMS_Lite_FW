@@ -23,6 +23,8 @@
 #include <main.h>
 
 extern runtimeParameters runtimePars;
+LTC_data_t LTC_data;
+uint8_t SPI_message, SPI_index;
 
 void LTC6803_init(void){
 	LTC_data.CFGR[0] = 0xE1;

@@ -20,8 +20,6 @@
 #ifndef IWDG_LL_H_
 #define IWDG_LL_H_
 
-volatile uint16_t IWDG_initialized;
-
 void IWDG_init(void);
 
 void IWDG_start(void);
