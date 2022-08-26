@@ -138,7 +138,7 @@ typedef enum
 	active5vRequest
 }_5vRequest_ID;
 
-enum
+typedef enum
 {
 	notCharging = 0,
 	chargingStarting,

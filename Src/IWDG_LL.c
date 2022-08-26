@@ -20,6 +20,8 @@
 #include "main.h"
 #include <IWDG_LL.h>
 
+volatile uint16_t IWDG_initialized;
+
 void IWDG_init(void){
 
 	if( IWDG_initialized == 0 ){		//check that IWDG is not initialized

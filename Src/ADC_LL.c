@@ -24,6 +24,19 @@
 extern nonVolParameters nonVolPars;
 extern runtimeParameters runtimePars;
 
+volatile uint16_t ADC_results[5];
+volatile uint16_t ADC_convertedResults[5];
+volatile uint16_t ADC_HighMin[3][2];
+volatile uint16_t ADC_conversionIndex;
+volatile uint16_t ADC_initialized;
+
+volatile uint16_t TS_CAL1;
+volatile uint16_t TS_CAL2;
+
+float intTempStep;
+float temp30Cvoltage;
+float HWmult[3];
+
 void ADC_init(void){
 
 	if( ADC_initialized == 0 ){		//check that ADC is not initialized

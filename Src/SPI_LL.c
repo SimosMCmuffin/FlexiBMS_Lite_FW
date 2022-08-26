@@ -20,6 +20,8 @@
 #include "stm32l4xx_hal.h"
 #include <SPI_LL.h>
 
+uint16_t SPI_initialized;
+
 void SPI1_init(){
 
 	if( SPI_initialized == 0 ){		//check that SPI is not initialized
